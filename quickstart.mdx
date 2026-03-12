@@ -1,0 +1,277 @@
+---
+title: Quickstart
+description: Get started with the Square Go SDK in under 5 minutes
+---
+
+This guide will walk you through creating your first payment with the Square Go SDK. You'll go from installation to processing a payment in just a few steps.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- Installed the Square Go SDK (see [Installation](/installation))
+- A Square account and access token (see [Authentication](/authentication))
+- Go 1.18 or higher installed
+
+## Step 1: Set Up Your Project
+
+<Steps>
+  <Step title="Create a new Go project">
+    Create a new directory for your project and initialize a Go module:
+
+    ```bash
+    mkdir square-quickstart
+    cd square-quickstart
+    go mod init square-quickstart
+    ```
+  </Step>
+
+  <Step title="Install the Square Go SDK">
+    Install the SDK using go get:
+
+    ```bash
+    go get github.com/square/square-go-sdk
+    ```
+  </Step>
+
+  <Step title="Create your main file">
+    Create a new file called `main.go`:
+
+    ```bash
+    touch main.go
+    ```
+  </Step>
+</Steps>
+
+## Step 2: Create Your First Payment
+
+Add the following code to `main.go`:
+
+```go main.go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    // Initialize the Square client
+    client := squareclient.NewClient(
+        option.WithToken("<YOUR_ACCESS_TOKEN>"),
+    )
+    
+    // Create a payment
+    response, err := client.Payments.Create(
+        context.TODO(),
+        &square.CreatePaymentRequest{
+            IdempotencyKey: "4935a656-a929-4792-b97c-8848be85c27c",
+            SourceID:       "CASH",
+            AmountMoney: &square.Money{
+                Amount:   square.Int64(100),
+                Currency: square.CurrencyUsd.Ptr(),
+            },
+            TipMoney: &square.Money{
+                Amount:   square.Int64(50),
+                Currency: square.CurrencyUsd.Ptr(),
+            },
+            CashDetails: &square.CashPaymentDetails{
+                BuyerSuppliedMoney: &square.Money{
+                    Amount:   square.Int64(200),
+                    Currency: square.CurrencyUsd.Ptr(),
+                },
+            },
+        },
+    )
+
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    fmt.Printf("Payment created successfully!\n")
+    fmt.Printf("Payment ID: %s\n", *response.Payment.ID)
+    fmt.Printf("Status: %s\n", *response.Payment.Status)
+}
+```
+
+<Note>
+  Replace `<YOUR_ACCESS_TOKEN>` with your actual Square access token. Never commit access tokens to version control. Use environment variables instead (see [Authentication](/authentication)).
+</Note>
+
+## Step 3: Understanding the Code
+
+Let's break down what this code does:
+
+<Accordion title="Client Initialization">
+  ```go
+  client := squareclient.NewClient(
+      option.WithToken("<YOUR_ACCESS_TOKEN>"),
+  )
+  ```
+
+  This creates a new Square client with your access token. The client provides access to all Square APIs through type-safe methods.
+</Accordion>
+
+<Accordion title="Idempotency Key">
+  ```go
+  IdempotencyKey: "4935a656-a929-4792-b97c-8848be85c27c",
+  ```
+
+  The idempotency key ensures that if you accidentally retry the same request, Square won't process it twice. Use a unique UUID for each payment attempt.
+</Accordion>
+
+<Accordion title="Money Objects">
+  ```go
+  AmountMoney: &square.Money{
+      Amount:   square.Int64(100),
+      Currency: square.CurrencyUsd.Ptr(),
+  },
+  ```
+
+  Amounts are represented in the smallest currency unit (cents for USD). This example creates a payment for $1.00 (100 cents).
+</Accordion>
+
+<Accordion title="Optional Parameters">
+  ```go
+  TipMoney: &square.Money{
+      Amount:   square.Int64(50),
+      Currency: square.CurrencyUsd.Ptr(),
+  },
+  ```
+
+  Optional parameters use pointers. The SDK provides helper functions like `square.Int64()` and `.Ptr()` to create pointers easily.
+</Accordion>
+
+## Step 4: Run Your Code
+
+Execute your program:
+
+```bash
+go run main.go
+```
+
+If successful, you'll see output like:
+
+```
+Payment created successfully!
+Payment ID: AbCdEfGhIjKlMnOpQrStUvWxYz
+Status: COMPLETED
+```
+
+## Next Steps
+
+Congratulations! You've successfully created your first payment with the Square Go SDK. Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="List Payments" icon="list" href="/core-concepts/pagination">
+    Learn how to list and paginate through payments
+  </Card>
+  <Card title="Handle Errors" icon="triangle-exclamation" href="/core-concepts/error-handling">
+    Implement proper error handling for production apps
+  </Card>
+  <Card title="Explore Other APIs" icon="compass" href="/api-reference/overview">
+    Discover the full range of Square APIs available
+  </Card>
+  <Card title="Use Sandbox Mode" icon="flask" href="/core-concepts/environments">
+    Test your integration without real money
+  </Card>
+</CardGroup>
+
+## Additional Examples
+
+### List Payments with Pagination
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    client := squareclient.NewClient(
+        option.WithToken("<YOUR_ACCESS_TOKEN>"),
+    )
+
+    ctx := context.TODO()
+    page, err := client.Payments.List(
+        ctx,
+        &square.ListPaymentsRequest{
+            Limit: square.Int(10),
+        },
+    )
+    if err != nil {
+        fmt.Println(err)
+        return
+    }
+
+    // Use the iterator for automatic pagination
+    iter := page.Iterator()
+    for iter.Next(ctx) {
+        payment := iter.Current()
+        fmt.Printf("Payment: %s - %s\n", *payment.ID, *payment.Status)
+    }
+    
+    if err := iter.Err(); err != nil {
+        fmt.Println(err)
+    }
+}
+```
+
+### Use Sandbox Environment
+
+```go
+package main
+
+import (
+    "context"
+
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    // Configure client for sandbox environment
+    client := squareclient.NewClient(
+        option.WithToken("<YOUR_SANDBOX_ACCESS_TOKEN>"),
+        option.WithBaseURL(square.Environments.Sandbox),
+    )
+
+    // Now all API calls use the sandbox environment
+    response, err := client.Payments.Create(context.TODO(), &square.CreatePaymentRequest{
+        // ... your payment request
+    })
+    
+    // Handle response...
+}
+```
+
+## Troubleshooting
+
+<Accordion title="Authentication Error">
+  If you see an authentication error, make sure your access token is valid and has the necessary permissions. Visit the [Square Developer Dashboard](https://developer.squareup.com/apps) to check your credentials.
+</Accordion>
+
+<Accordion title="Import Errors">
+  If you're getting import errors, make sure you've installed the SDK:
+  ```bash
+  go get github.com/square/square-go-sdk
+  ```
+</Accordion>
+
+<Accordion title="Type Errors">
+  Remember that optional parameters use pointers. Use helper functions like `square.String()`, `square.Int64()`, and `.Ptr()` for enums.
+</Accordion>
+
+You're now ready to build with Square! Explore the [Authentication](/authentication) guide for advanced configuration options.
