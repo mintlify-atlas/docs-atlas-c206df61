@@ -1,0 +1,400 @@
+---
+title: "Vendors"
+description: "Manage vendor information for purchase orders and inventory"
+---
+
+The Vendors API allows you to create and manage vendor records representing suppliers to your business. This enables tracking of purchase orders, inventory sources, and supplier relationships.
+
+## Overview
+
+The Vendors client provides methods for:
+- Creating vendor records individually or in batches
+- Retrieving vendor information
+- Updating vendor details
+- Searching for vendors
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### Create Vendor
+
+Creates a single vendor object to represent a supplier to a seller.
+
+```go vendors.go:17163
+request := &square.CreateVendorRequest{
+    IdempotencyKey: "8fc6a5b0-9fe8-4b46-b46b-2ef95793abbe",
+    Vendor: &square.Vendor{
+        Name: square.String("Joe's Fresh Seafood"),
+        Address: &square.Address{
+            AddressLine1: square.String("505 Electric Ave"),
+            AddressLine2: square.String("Suite 600"),
+            Locality: square.String("New York"),
+            AdministrativeDistrictLevel1: square.String("NY"),
+            PostalCode: square.String("10003"),
+            Country: square.CountryUs.Ptr(),
+        },
+        Contacts: []*square.VendorContact{
+            &square.VendorContact{
+                Name: square.String("Joe Burrow"),
+                EmailAddress: square.String("joe@joesfreshseafood.com"),
+                PhoneNumber: square.String("1-212-555-4250"),
+                Ordinal: 1,
+            },
+        },
+        AccountNumber: square.String("4025391"),
+        Note: square.String("Primary seafood supplier"),
+    },
+}
+response, err := client.Vendors.Create(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="idempotencyKey" type="string" required>
+  A client-supplied, universally unique identifier (UUID) to make this CreateVendor call idempotent.
+</ParamField>
+
+<ParamField path="vendor" type="Vendor" required>
+  The vendor object to create.
+</ParamField>
+
+<ParamField path="vendor.name" type="string">
+  The name of the vendor.
+</ParamField>
+
+<ParamField path="vendor.address" type="Address">
+  The physical address of the vendor.
+</ParamField>
+
+<ParamField path="vendor.contacts" type="[]VendorContact">
+  The contacts for the vendor.
+</ParamField>
+
+<ParamField path="vendor.accountNumber" type="string">
+  The account number used to identify the vendor in your accounting system.
+</ParamField>
+
+<ParamField path="vendor.note" type="string">
+  A note detailing information about the vendor.
+</ParamField>
+
+<ResponseField name="vendor" type="Vendor">
+  The created vendor record.
+</ResponseField>
+
+### Batch Create Vendors
+
+Creates one or more vendor objects to represent suppliers to a seller.
+
+```go vendors.go:16925
+request := &square.BatchCreateVendorsRequest{
+    Vendors: map[string]*square.Vendor{
+        "8fc6a5b0-9fe8-4b46-b46b-2ef95793abbe": &square.Vendor{
+            Name: square.String("Joe's Fresh Seafood"),
+            Address: &square.Address{
+                AddressLine1: square.String("505 Electric Ave"),
+                AddressLine2: square.String("Suite 600"),
+                Locality: square.String("New York"),
+                AdministrativeDistrictLevel1: square.String("NY"),
+                PostalCode: square.String("10003"),
+                Country: square.CountryUs.Ptr(),
+            },
+            Contacts: []*square.VendorContact{
+                &square.VendorContact{
+                    Name: square.String("Joe Burrow"),
+                    EmailAddress: square.String("joe@joesfreshseafood.com"),
+                    PhoneNumber: square.String("1-212-555-4250"),
+                    Ordinal: 1,
+                },
+            },
+            AccountNumber: square.String("4025391"),
+            Note: square.String("a vendor"),
+        },
+    },
+}
+response, err := client.Vendors.BatchCreate(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="vendors" type="map[string]*Vendor" required>
+  A collection of idempotency-key/Vendor-object pairs.
+</ParamField>
+
+<ResponseField name="vendors" type="map[string]*Vendor">
+  The created vendor records, keyed by idempotency key.
+</ResponseField>
+
+### Get Vendor
+
+Retrieves the vendor of a specified vendor ID.
+
+```go vendors.go:17318
+request := &square.GetVendorsRequest{
+    VendorID: "vendor_id",
+}
+response, err := client.Vendors.Get(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="vendorID" type="string" required>
+  ID of the vendor to retrieve.
+</ParamField>
+
+<ResponseField name="vendor" type="Vendor">
+  The requested vendor.
+</ResponseField>
+
+### Batch Get Vendors
+
+Retrieves one or more vendors of specified vendor IDs.
+
+```go vendors.go:16988
+request := &square.BatchGetVendorsRequest{
+    VendorIDs: []string{
+        "INV_V_JDKYHBWT1D4F8MFH63DBMEN8Y4",
+    },
+}
+response, err := client.Vendors.BatchGet(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="vendorIDs" type="[]string" required>
+  IDs of the vendors to retrieve.
+</ParamField>
+
+<ResponseField name="vendors" type="[]Vendor">
+  The requested vendors.
+</ResponseField>
+
+### Update Vendor
+
+Updates an existing vendor object as a supplier to a seller.
+
+```go vendors.go:17395
+request := &square.UpdateVendorsRequest{
+    VendorID: "vendor_id",
+    Body: &square.UpdateVendorRequest{
+        IdempotencyKey: square.String("8fc6a5b0-9fe8-4b46-b46b-2ef95793abbe"),
+        Vendor: &square.Vendor{
+            ID: square.String("INV_V_JDKYHBWT1D4F8MFH63DBMEN8Y4"),
+            Name: square.String("Jack's Chicken Shack"),
+            Version: square.Int(1),
+            Status: square.VendorStatusActive.Ptr(),
+        },
+    },
+}
+response, err := client.Vendors.Update(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="vendorID" type="string" required>
+  ID of the vendor to update.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string">
+  A client-supplied, universally unique identifier (UUID) for idempotency.
+</ParamField>
+
+<ParamField path="vendor" type="Vendor" required>
+  The vendor fields to update.
+</ParamField>
+
+<ResponseField name="vendor" type="Vendor">
+  The updated vendor.
+</ResponseField>
+
+### Batch Update Vendors
+
+Updates one or more existing vendor objects as suppliers to a seller.
+
+```go vendors.go:17056
+request := &square.BatchUpdateVendorsRequest{
+    Vendors: map[string]*square.UpdateVendorRequest{
+        "FMCYHBWT1TPL8MFH52PBMEN92A": &square.UpdateVendorRequest{
+            Vendor: &square.Vendor{},
+        },
+        "INV_V_JDKYHBWT1D4F8MFH63DBMEN8Y4": &square.UpdateVendorRequest{
+            Vendor: &square.Vendor{},
+        },
+    },
+}
+response, err := client.Vendors.BatchUpdate(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="vendors" type="map[string]*UpdateVendorRequest" required>
+  A set of UpdateVendorRequest objects encapsulating to-be-updated Vendor objects, represented by Vendor-ID/UpdateVendorRequest-object pairs.
+</ParamField>
+
+<ResponseField name="vendors" type="map[string]*Vendor">
+  The updated vendors, keyed by vendor ID.
+</ResponseField>
+
+### Search Vendors
+
+Searches for vendors using a filter against supported vendor properties and a supported sorter.
+
+```go vendors.go:17236
+request := &square.SearchVendorsRequest{
+    Filter: &square.SearchVendorsRequestFilter{
+        Name: []string{"Joe's"},
+        Status: []square.VendorStatus{
+            square.VendorStatusActive,
+        },
+    },
+    Sort: &square.SearchVendorsRequestSort{
+        Field: square.VendorSortFieldName.Ptr(),
+        Order: square.SortOrderAsc.Ptr(),
+    },
+    Cursor: square.String("cursor"),
+}
+response, err := client.Vendors.Search(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="filter" type="SearchVendorsRequestFilter">
+  Specifies a filter used to search for vendors.
+</ParamField>
+
+<ParamField path="sort" type="SearchVendorsRequestSort">
+  Specifies a sorter used to sort the returned vendors.
+</ParamField>
+
+<ParamField path="cursor" type="string">
+  A pagination cursor returned by a previous call to this endpoint.
+</ParamField>
+
+<ResponseField name="vendors" type="[]Vendor">
+  The list of vendors matching the search criteria.
+</ResponseField>
+
+## Use Cases
+
+### Create Vendor with Contact Information
+
+Add a new supplier with complete contact details:
+
+```go
+request := &square.CreateVendorRequest{
+    IdempotencyKey: uuid.New().String(),
+    Vendor: &square.Vendor{
+        Name: square.String("Fresh Produce Co."),
+        Address: &square.Address{
+            AddressLine1: square.String("123 Market Street"),
+            Locality: square.String("San Francisco"),
+            AdministrativeDistrictLevel1: square.String("CA"),
+            PostalCode: square.String("94102"),
+            Country: square.CountryUs.Ptr(),
+        },
+        Contacts: []*square.VendorContact{
+            &square.VendorContact{
+                Name: square.String("John Smith"),
+                EmailAddress: square.String("john@freshproduce.com"),
+                PhoneNumber: square.String("+1-415-555-1234"),
+                Ordinal: 1,
+            },
+        },
+        AccountNumber: square.String("VENDOR-001"),
+        Note: square.String("Primary produce supplier"),
+    },
+}
+
+response, err := client.Vendors.Create(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created vendor: %s\n", *response.Vendor.ID)
+```
+
+### Search for Active Vendors
+
+Find all active vendors:
+
+```go
+request := &square.SearchVendorsRequest{
+    Filter: &square.SearchVendorsRequestFilter{
+        Status: []square.VendorStatus{
+            square.VendorStatusActive,
+        },
+    },
+    Sort: &square.SearchVendorsRequestSort{
+        Field: square.VendorSortFieldName.Ptr(),
+        Order: square.SortOrderAsc.Ptr(),
+    },
+}
+
+response, err := client.Vendors.Search(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, vendor := range response.Vendors {
+    fmt.Printf("Vendor: %s\n", *vendor.Name)
+}
+```
+
+### Update Vendor Status
+
+Deactivate a vendor:
+
+```go
+request := &square.UpdateVendorsRequest{
+    VendorID: "vendor_id",
+    Body: &square.UpdateVendorRequest{
+        IdempotencyKey: square.String(uuid.New().String()),
+        Vendor: &square.Vendor{
+            Status: square.VendorStatusInactive.Ptr(),
+            Version: square.Int(currentVersion),
+        },
+    },
+}
+
+response, err := client.Vendors.Update(context.TODO(), request)
+```
+
+## Best Practices
+
+- **Use idempotency keys**: Prevent duplicate vendor creation with unique idempotency keys
+- **Maintain accurate contacts**: Keep vendor contact information up to date
+- **Track versions**: Use version numbers for optimistic concurrency control
+- **Use account numbers**: Link vendors to your accounting system with account numbers
+- **Add detailed notes**: Include relevant supplier information in the notes field
+- **Batch operations**: Use batch methods when creating or updating multiple vendors
+
+## Vendor Status
+
+Vendors can have the following statuses:
+
+- `ACTIVE` - Vendor is active and available for use
+- `INACTIVE` - Vendor is inactive and not available for use
+
+## Related Resources
+
+- [Inventory API](/api-reference/inventory)
+- [Transfer Orders](/api-reference/transfer-orders)

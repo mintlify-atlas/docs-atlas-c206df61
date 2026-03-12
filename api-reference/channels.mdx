@@ -1,0 +1,398 @@
+---
+title: "Channels"
+description: "Manage sales channels and integrations with the Square Go SDK"
+---
+
+The Channels API allows you to retrieve information about sales channels and integrations connected to a Square merchant account. Channels represent different ways merchants can sell, such as through locations, online sites, or third-party integrations.
+
+## Overview
+
+The `Channels` client provides methods to:
+- List channels with filtering options
+- Retrieve a specific channel by ID
+- Bulk retrieve multiple channels
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+    "github.com/square/square-go-sdk/v3/core"
+)
+
+client := square.NewClient(
+    &core.RequestOptions{
+        Token: "YOUR_ACCESS_TOKEN",
+    },
+)
+```
+
+## Methods
+
+### List Channels
+
+Retrieves a list of channels with optional filtering by reference type, reference ID, and status.
+
+```go channels/client.go
+request := &square.ListChannelsRequest{
+    ReferenceType: square.ReferenceTypeLocation.Ptr(),
+    Status:        square.ChannelStatusActive.Ptr(),
+    Cursor:        square.String("cursor_value"),
+    Limit:         square.Int(50),
+}
+
+response, err := client.Channels.List(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, channel := range response.Channels {
+    fmt.Printf("Channel: %s (ID: %s)\n", *channel.Name, *channel.ID)
+    fmt.Printf("Type: %s\n", *channel.Reference.Type)
+    fmt.Printf("Status: %s\n", *channel.Status)
+}
+
+// Handle pagination
+if response.Cursor != nil {
+    // Use response.Cursor for the next page
+}
+```
+
+<ParamField path="reference_type" type="*ReferenceType">
+  Type of reference associated with the channel. Filters results to channels associated with this reference type.
+</ParamField>
+
+<ParamField path="reference_id" type="*string">
+  ID of reference associated with the channel. Filters results to channels associated with this specific reference ID.
+</ParamField>
+
+<ParamField path="status" type="*ChannelStatus">
+  Status of channel. Filters results by channel status:
+  - `ACTIVE`: Active channels
+  - `INACTIVE`: Inactive channels
+</ParamField>
+
+<ParamField path="cursor" type="*string">
+  Pagination cursor to fetch the next result set
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  Maximum number of results to return. When not provided, the returned results will be capped at 100 channels.
+</ParamField>
+
+<ResponseField name="channels" type="[]*Channel">
+  List of requested channels
+  
+  <Expandable title="Channel Object">
+    <ResponseField name="id" type="string">
+      The channel's unique ID
+    </ResponseField>
+    
+    <ResponseField name="merchant_id" type="string">
+      The unique ID of the merchant this channel belongs to
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The name of the channel
+    </ResponseField>
+    
+    <ResponseField name="version" type="int">
+      Version number incremented with each update
+    </ResponseField>
+    
+    <ResponseField name="reference" type="Reference">
+      The entity the channel is associated with
+    </ResponseField>
+    
+    <ResponseField name="status" type="ChannelStatus">
+      Status of the channel: ACTIVE or INACTIVE
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      Creation timestamp in RFC 3339 format
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      Last update timestamp in RFC 3339 format
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="cursor" type="string">
+  The pagination cursor for the next page of results
+</ResponseField>
+
+### Get Channel
+
+Retrieves a single channel by its ID.
+
+```go channels/client.go
+request := &square.GetChannelsRequest{
+    ChannelID: "CHANNEL_ID",
+}
+
+response, err := client.Channels.Get(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+channel := response.Channel
+fmt.Printf("Channel Name: %s\n", *channel.Name)
+fmt.Printf("Status: %s\n", *channel.Status)
+fmt.Printf("Reference Type: %s\n", *channel.Reference.Type)
+fmt.Printf("Reference ID: %s\n", *channel.Reference.ID)
+```
+
+<ParamField path="channelID" type="string" required>
+  The unique ID of the channel to retrieve
+</ParamField>
+
+<ResponseField name="channel" type="Channel">
+  The requested channel object
+</ResponseField>
+
+### Bulk Retrieve Channels
+
+Retrieves multiple channels by their IDs in a single request.
+
+```go channels/client.go
+request := &square.BulkRetrieveChannelsRequest{
+    ChannelIDs: []string{
+        "CHANNEL_ID_1",
+        "CHANNEL_ID_2",
+        "CHANNEL_ID_3",
+    },
+}
+
+response, err := client.Channels.BulkRetrieveChannels(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+// Process the responses map
+for channelID, channelResponse := range response.Responses {
+    if channelResponse.Channel != nil {
+        fmt.Printf("Channel %s: %s\n", channelID, *channelResponse.Channel.Name)
+    } else if len(channelResponse.Errors) > 0 {
+        fmt.Printf("Failed to retrieve channel %s\n", channelID)
+    }
+}
+```
+
+<ParamField path="channel_ids" type="[]string" required>
+  Array of channel IDs to retrieve
+</ParamField>
+
+<ResponseField name="responses" type="map[string]*RetrieveChannelResponse">
+  A map of channel IDs to channel responses. Each response contains either channel info (success) or error info (failure).
+</ResponseField>
+
+## Response Types
+
+### Channel
+
+Represents a sales channel or integration.
+
+<ResponseField name="id" type="string">
+  The channel's unique ID
+</ResponseField>
+
+<ResponseField name="merchant_id" type="string">
+  The unique ID of the merchant this channel belongs to
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The name of the channel
+</ResponseField>
+
+<ResponseField name="version" type="int">
+  The version number which is incremented each time an update is made to the channel
+</ResponseField>
+
+<ResponseField name="reference" type="Reference">
+  Represents an entity the channel is associated with
+  
+  <Expandable title="Reference Object">
+    <ResponseField name="type" type="ReferenceType">
+      The type of entity the channel is associated with
+    </ResponseField>
+    
+    <ResponseField name="id" type="string">
+      The ID of the entity the channel is associated with
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="status" type="ChannelStatus">
+  Status of the channel:
+  - `ACTIVE`: The channel is active
+  - `INACTIVE`: The channel is inactive
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  The timestamp for when the channel was created, in RFC 3339 format
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  The timestamp for when the channel was last updated, in RFC 3339 format
+</ResponseField>
+
+### ReferenceType
+
+The type of platform concept a channel can represent:
+
+- `UNKNOWN_TYPE`: Unknown or unspecified type
+- `LOCATION`: A physical location
+- `FIRST_PARTY_INTEGRATION`: A Square first-party integration
+- `OAUTH_APPLICATION`: An OAuth application
+- `ONLINE_SITE`: A Square Online site
+- `ONLINE_CHECKOUT`: Square Online Checkout
+- `INVOICE`: Square Invoices
+- `GIFT_CARD`: Square Gift Cards
+- `GIFT_CARD_MARKETPLACE`: Gift Card Marketplace
+- `RECURRING_SUBSCRIPTION`: Subscriptions
+- `ONLINE_BOOKING_FLOW`: Square Appointments online booking
+- `SQUARE_ASSISTANT`: Square Assistant
+- `CASH_LOCAL`: Cash transactions
+- `POINT_OF_SALE`: Square Point of Sale
+- `KIOSK`: Kiosk devices
+
+## Use Cases
+
+### List All Active Location Channels
+
+```go
+request := &square.ListChannelsRequest{
+    ReferenceType: square.ReferenceTypeLocation.Ptr(),
+    Status:        square.ChannelStatusActive.Ptr(),
+    Limit:         square.Int(100),
+}
+
+response, err := client.Channels.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Active Location Channels:")
+for _, channel := range response.Channels {
+    fmt.Printf("- %s (Location ID: %s)\n", *channel.Name, *channel.Reference.ID)
+}
+```
+
+### Get Channels for a Specific Location
+
+```go
+locationID := "LOCATION_ID"
+
+request := &square.ListChannelsRequest{
+    ReferenceType: square.ReferenceTypeLocation.Ptr(),
+    ReferenceID:   square.String(locationID),
+    Status:        square.ChannelStatusActive.Ptr(),
+}
+
+response, err := client.Channels.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Channels for location %s:\n", locationID)
+for _, channel := range response.Channels {
+    fmt.Printf("- %s (Created: %s)\n", *channel.Name, *channel.CreatedAt)
+}
+```
+
+### List All Online Channels
+
+```go
+request := &square.ListChannelsRequest{
+    ReferenceType: square.ReferenceTypeOnlineSite.Ptr(),
+    Status:        square.ChannelStatusActive.Ptr(),
+}
+
+response, err := client.Channels.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Online Site Channels:")
+for _, channel := range response.Channels {
+    fmt.Printf("- %s (Site ID: %s)\n", *channel.Name, *channel.Reference.ID)
+}
+```
+
+### Retrieve Multiple Channels Efficiently
+
+```go
+// Collect channel IDs from various sources
+channelIDs := []string{"CHANNEL_1", "CHANNEL_2", "CHANNEL_3"}
+
+// Bulk retrieve all channels in one request
+request := &square.BulkRetrieveChannelsRequest{
+    ChannelIDs: channelIDs,
+}
+
+response, err := client.Channels.BulkRetrieveChannels(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Process results
+for id, channelResponse := range response.Responses {
+    if channelResponse.Channel != nil {
+        fmt.Printf("✓ %s: %s\n", id, *channelResponse.Channel.Name)
+    } else {
+        fmt.Printf("✗ %s: Failed to retrieve\n", id)
+    }
+}
+```
+
+### Paginate Through All Channels
+
+```go
+var allChannels []*square.Channel
+var cursor *string
+
+for {
+    request := &square.ListChannelsRequest{
+        Limit:  square.Int(100),
+        Cursor: cursor,
+    }
+    
+    response, err := client.Channels.List(context.TODO(), request)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    allChannels = append(allChannels, response.Channels...)
+    
+    // Check if there are more pages
+    if response.Cursor == nil || *response.Cursor == "" {
+        break
+    }
+    cursor = response.Cursor
+}
+
+fmt.Printf("Total channels retrieved: %d\n", len(allChannels))
+```
+
+## Error Handling
+
+```go
+response, err := client.Channels.Get(context.TODO(), request)
+if err != nil {
+    // Check for API errors
+    if response != nil && len(response.Errors) > 0 {
+        for _, e := range response.Errors {
+            fmt.Printf("Error: %s - %s\n", e.Category, e.Detail)
+        }
+    }
+    return err
+}
+```
+
+## Related Resources
+
+- [Locations API](/api-reference/locations)
+- [Sites API](/api-reference/sites)
+- [OAuth API](/api-reference/oauth)

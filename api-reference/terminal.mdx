@@ -1,0 +1,152 @@
+---
+title: "Terminal"
+description: "Accept in-person payments using Square Terminal devices"
+---
+
+The Terminal API enables you to create and manage checkout, refund, and action requests for Square Terminal devices. This allows you to build custom point-of-sale experiences that integrate with Square's hardware.
+
+## Overview
+
+The Terminal client provides methods for:
+- Creating and managing terminal checkouts for accepting payments
+- Processing refunds through terminal devices
+- Sending custom actions to terminal devices
+- Managing terminal device states
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### DismissTerminalAction
+
+Dismisses a Terminal action request if the status and type of the request permits it.
+
+```go terminal.go:15882
+request := &square.DismissTerminalActionRequest{
+    ActionID: "action_id",
+}
+response, err := client.Terminal.DismissTerminalAction(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="actionID" type="string" required>
+  Unique ID for the `TerminalAction` associated with the action to be dismissed.
+</ParamField>
+
+<ResponseField name="action" type="TerminalAction">
+  The dismissed terminal action.
+</ResponseField>
+
+### DismissTerminalCheckout
+
+Dismisses a Terminal checkout request if the status and type of the request permits it.
+
+```go terminal.go:15943
+request := &square.DismissTerminalCheckoutRequest{
+    CheckoutID: "checkout_id",
+}
+response, err := client.Terminal.DismissTerminalCheckout(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="checkoutID" type="string" required>
+  Unique ID for the `TerminalCheckout` associated with the checkout to be dismissed.
+</ParamField>
+
+<ResponseField name="checkout" type="TerminalCheckout">
+  The dismissed terminal checkout.
+</ResponseField>
+
+### DismissTerminalRefund
+
+Dismisses a Terminal refund request if the status and type of the request permits it.
+
+```go terminal.go:16003
+request := &square.DismissTerminalRefundRequest{
+    TerminalRefundID: "terminal_refund_id",
+}
+response, err := client.Terminal.DismissTerminalRefund(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="terminalRefundID" type="string" required>
+  Unique ID for the `TerminalRefund` associated with the refund to be dismissed.
+</ParamField>
+
+<ResponseField name="refund" type="TerminalRefund">
+  The dismissed terminal refund.
+</ResponseField>
+
+## Use Cases
+
+### Accept In-Person Payments
+
+Use Terminal checkouts to process payments through Square Terminal devices:
+
+```go
+checkout := &square.CreateTerminalCheckoutRequest{
+    IdempotencyKey: "unique-key-123",
+    Checkout: &square.TerminalCheckout{
+        AmountMoney: &square.Money{
+            Amount:   1000,  // $10.00
+            Currency: square.CurrencyUsd,
+        },
+        DeviceOptions: &square.DeviceCheckoutOptions{
+            DeviceID: "device_id",
+        },
+    },
+}
+
+response, err := client.Terminal.CreateCheckout(context.TODO(), checkout)
+```
+
+### Process Refunds
+
+Issue refunds directly through terminal devices:
+
+```go
+refund := &square.CreateTerminalRefundRequest{
+    IdempotencyKey: "unique-refund-key-456",
+    Refund: &square.TerminalRefund{
+        PaymentID: "payment_id",
+        AmountMoney: &square.Money{
+            Amount:   500,  // $5.00
+            Currency: square.CurrencyUsd,
+        },
+        DeviceID: "device_id",
+    },
+}
+
+response, err := client.Terminal.CreateRefund(context.TODO(), refund)
+```
+
+## Best Practices
+
+- Always use idempotency keys to prevent duplicate transactions
+- Handle device unavailability gracefully with timeouts
+- Implement proper error handling for network issues
+- Use dismiss methods to cancel pending requests when needed
+- Monitor terminal device status before initiating requests
+
+## Related Resources
+
+- [Devices API](/api-reference/devices) - Manage Square Terminal devices
+- [Payments API](/api-reference/payments) - Process payments
+- [Refunds API](/api-reference/refunds) - Handle refunds

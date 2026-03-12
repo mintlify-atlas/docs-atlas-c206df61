@@ -1,0 +1,232 @@
+---
+title: Extra Properties
+description: Send and receive additional properties not defined in the SDK
+---
+
+The Square Go SDK supports sending and receiving extra properties that are not explicitly defined in the SDK types. This is useful when you need to interact with unreleased features, beta functionality, or properties that haven't been added to the SDK yet.
+
+## Sending Extra Properties
+
+You can send additional request body properties and query parameters using the request option functions.
+
+### Extra Query Parameters
+
+Use `option.WithQueryParameters()` to add query parameters that aren't directly supported by the request type.
+
+For example, suppose a new feature was rolled out that allowed you to filter team members by status. You can add the relevant query parameters like this:
+
+```go
+import (
+    "context"
+    "net/url"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+    )
+    
+    response, err := client.TeamMembers.Search(
+        context.TODO(),
+        &square.SearchTeamMembersRequest{
+            Limit: square.Int(100),
+        },
+        option.WithQueryParameters(
+            url.Values{
+                "status": []string{"DEACTIVATED"},
+            },
+        ),
+    )
+    
+    if err != nil {
+        // Handle error
+    }
+}
+```
+
+<Note>
+The `url.Values` type from the standard library `net/url` package is used to construct the query parameters.
+</Note>
+
+### Extra Body Properties
+
+Use `option.WithBodyProperties()` to add additional fields to the request body:
+
+```go
+import (
+    "context"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+    )
+    
+    response, err := client.Payments.Create(
+        context.TODO(),
+        &square.CreatePaymentRequest{
+            IdempotencyKey: "4935a656-a929-4792-b97c-8848be85c27c",
+            SourceID:       "CASH",
+            AmountMoney: &square.Money{
+                Amount:   square.Int64(100),
+                Currency: square.CurrencyUsd.Ptr(),
+            },
+        },
+        option.WithBodyProperties(
+            map[string]interface{}{
+                "experimental_feature": true,
+                "metadata": map[string]string{
+                    "custom_field": "value",
+                },
+            },
+        ),
+    )
+    
+    if err != nil {
+        // Handle error
+    }
+}
+```
+
+<Warning>
+Extra body properties are merged with the request struct's JSON representation. Make sure property names don't conflict with existing fields.
+</Warning>
+
+## Receiving Extra Properties
+
+Every response type in the SDK includes the `GetExtraProperties()` method, which returns a map containing any properties in the JSON response that were not defined in the response struct.
+
+### Basic Usage
+
+Access extra properties from any response:
+
+```go
+import (
+    "context"
+    "fmt"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+    )
+    
+    response, err := client.Payments.Create(
+        context.TODO(),
+        &square.CreatePaymentRequest{
+            IdempotencyKey: "4935a656-a929-4792-b97c-8848be85c27c",
+            SourceID:       "CASH",
+            AmountMoney: &square.Money{
+                Amount:   square.Int64(100),
+                Currency: square.CurrencyUsd.Ptr(),
+            },
+        },
+    )
+    
+    if err != nil {
+        // Handle error
+        return
+    }
+    
+    // Get extra properties from the response
+    extraProperties := response.GetExtraProperties()
+    
+    // Check if a specific property exists
+    if value, ok := extraProperties["beta_feature"]; ok {
+        fmt.Printf("Beta feature value: %v\n", value)
+    }
+}
+```
+
+### Working with Nested Properties
+
+Extra properties can contain nested structures. Use type assertions to work with them:
+
+```go
+extraProperties := response.GetExtraProperties()
+
+if metadata, ok := extraProperties["metadata"].(map[string]interface{}); ok {
+    if customField, ok := metadata["custom_field"].(string); ok {
+        fmt.Printf("Custom field: %s\n", customField)
+    }
+}
+```
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Beta Features" icon="flask">
+    Test unreleased API features during beta periods without waiting for SDK updates.
+  </Card>
+  <Card title="Backward Compatibility" icon="clock-rotate-left">
+    Access deprecated fields or legacy response properties that may not be in the latest SDK.
+  </Card>
+  <Card title="Custom Extensions" icon="puzzle-piece">
+    Work with Square's custom implementations or partner-specific extensions.
+  </Card>
+  <Card title="Future-Proofing" icon="shield">
+    Ensure your code can handle new response fields without breaking.
+  </Card>
+</CardGroup>
+
+## Implementation Details
+
+The extra properties feature is implemented in the SDK's code generation:
+
+- All response structs include an `extraProperties map[string]interface{}` field
+- The JSON unmarshaling process captures unknown fields into this map
+- The `GetExtraProperties()` method provides safe access to these fields
+
+```go
+// Example implementation from the SDK
+func (a *AcceptedPaymentMethods) GetExtraProperties() map[string]interface{} {
+    if a == nil {
+        return nil
+    }
+    return a.extraProperties
+}
+```
+
+<Tip>
+Always check if the response is nil before calling `GetExtraProperties()` to avoid nil pointer panics.
+</Tip>
+
+## Best Practices
+
+1. **Use sparingly**: Extra properties should be a temporary solution. Request proper SDK support for frequently used features.
+
+2. **Type assertions**: Always use type assertions with the ok idiom when accessing extra property values:
+   ```go
+   if value, ok := extraProperties["field"].(string); ok {
+       // Use value safely
+   }
+   ```
+
+3. **Documentation**: Document any extra properties you use in your code comments for future maintainability.
+
+4. **Testing**: Include tests for code that relies on extra properties, as these fields may change without notice.
+
+5. **Error handling**: Be prepared for extra properties to be absent or have different types than expected.
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Custom HTTP Client" icon="gear" href="/advanced/custom-http-client">
+    Learn how to provide custom HTTP clients for advanced use cases
+  </Card>
+  <Card title="Request Options" icon="sliders" href="/core-concepts/request-options">
+    Explore all available request options for customizing SDK behavior
+  </Card>
+</CardGroup>

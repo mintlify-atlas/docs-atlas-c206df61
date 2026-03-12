@@ -1,0 +1,483 @@
+---
+title: "Transfer Orders"
+description: "Manage inventory transfers between locations"
+---
+
+The Transfer Orders API enables you to create and manage transfer orders for moving inventory between locations. This helps you track inventory redistribution and maintain accurate stock levels across multiple locations.
+
+## Overview
+
+The Transfer Orders client provides methods for:
+- Creating transfer orders to move inventory between locations
+- Searching for transfer orders
+- Retrieving transfer order details
+- Updating transfer orders
+- Starting, canceling, and receiving transfer orders
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### Create Transfer Order
+
+Creates a new transfer order in DRAFT status representing the intent to move items from one location to another.
+
+```go transfer_orders.go:16111
+request := &square.CreateTransferOrderRequest{
+    IdempotencyKey: "65cc0586-3e82-384s-b524-3885cffd52",
+    TransferOrder: &square.CreateTransferOrderData{
+        SourceLocationID: "EXAMPLE_SOURCE_LOCATION_ID_123",
+        DestinationLocationID: "EXAMPLE_DEST_LOCATION_ID_456",
+        ExpectedAt: square.String("2025-11-09T05:00:00Z"),
+        Notes: square.String("Example transfer order for inventory redistribution"),
+        TrackingNumber: square.String("TRACK123456789"),
+        CreatedByTeamMemberID: square.String("EXAMPLE_TEAM_MEMBER_ID_789"),
+        LineItems: []*square.CreateTransferOrderLineData{
+            &square.CreateTransferOrderLineData{
+                ItemVariationID: "EXAMPLE_ITEM_VARIATION_ID_001",
+                QuantityOrdered: "5",
+            },
+        },
+    },
+}
+response, err := client.TransferOrders.Create(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="idempotencyKey" type="string" required>
+  A unique string that identifies this CreateTransferOrder request.
+</ParamField>
+
+<ParamField path="transferOrder.sourceLocationID" type="string" required>
+  The ID of the source location from which items will be transferred.
+</ParamField>
+
+<ParamField path="transferOrder.destinationLocationID" type="string" required>
+  The ID of the destination location to which items will be transferred.
+</ParamField>
+
+<ParamField path="transferOrder.expectedAt" type="string">
+  The expected delivery date and time in RFC 3339 format.
+</ParamField>
+
+<ParamField path="transferOrder.notes" type="string">
+  Notes about the transfer order.
+</ParamField>
+
+<ParamField path="transferOrder.trackingNumber" type="string">
+  The tracking number for the shipment.
+</ParamField>
+
+<ParamField path="transferOrder.lineItems" type="[]CreateTransferOrderLineData">
+  The items to transfer.
+</ParamField>
+
+<ResponseField name="transferOrder" type="TransferOrder">
+  The created transfer order in DRAFT status.
+</ResponseField>
+
+### Search Transfer Orders
+
+Searches for transfer orders using filters and returns a paginated list.
+
+```go transfer_orders.go:16212
+request := &square.SearchTransferOrdersRequest{
+    Query: &square.TransferOrderQuery{
+        Filter: &square.TransferOrderFilter{
+            SourceLocationIDs: []string{"EXAMPLE_SOURCE_LOCATION_ID_123"},
+            DestinationLocationIDs: []string{"EXAMPLE_DEST_LOCATION_ID_456"},
+            Statuses: []square.TransferOrderStatus{
+                square.TransferOrderStatusStarted,
+                square.TransferOrderStatusPartiallyReceived,
+            },
+        },
+        Sort: &square.TransferOrderSort{
+            Field: square.TransferOrderSortFieldUpdatedAt.Ptr(),
+            Order: square.SortOrderDesc.Ptr(),
+        },
+    },
+    Limit: square.Int(10),
+}
+response, err := client.TransferOrders.Search(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="query.filter.sourceLocationIDs" type="[]string">
+  Filter by source location IDs.
+</ParamField>
+
+<ParamField path="query.filter.destinationLocationIDs" type="[]string">
+  Filter by destination location IDs.
+</ParamField>
+
+<ParamField path="query.filter.statuses" type="[]TransferOrderStatus">
+  Filter by transfer order statuses.
+</ParamField>
+
+<ParamField path="query.sort" type="TransferOrderSort">
+  Sorting criteria for results.
+</ParamField>
+
+<ParamField path="cursor" type="string">
+  Pagination cursor from a previous search response.
+</ParamField>
+
+<ParamField path="limit" type="int">
+  Maximum number of results to return (1-100).
+</ParamField>
+
+<ResponseField name="transferOrders" type="[]TransferOrder">
+  The list of transfer orders matching the search criteria.
+</ResponseField>
+
+### Get Transfer Order
+
+Retrieves a specific transfer order by ID with complete details.
+
+```go transfer_orders.go:16297
+request := &square.GetTransferOrdersRequest{
+    TransferOrderID: "transfer_order_id",
+}
+response, err := client.TransferOrders.Get(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="transferOrderID" type="string" required>
+  The ID of the transfer order to retrieve.
+</ParamField>
+
+<ResponseField name="transferOrder" type="TransferOrder">
+  The requested transfer order with all details.
+</ResponseField>
+
+### Update Transfer Order
+
+Updates an existing transfer order with sparse updates to specific fields.
+
+```go transfer_orders.go:16406
+request := &square.UpdateTransferOrderRequest{
+    TransferOrderID: "transfer_order_id",
+    IdempotencyKey: "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    TransferOrder: &square.UpdateTransferOrderData{
+        ExpectedAt: square.String("2025-11-10T08:00:00Z"),
+        Notes: square.String("Updated: Priority transfer"),
+        LineItems: []*square.UpdateTransferOrderLineData{
+            &square.UpdateTransferOrderLineData{
+                UID: square.String("1"),
+                QuantityOrdered: square.String("7"),
+            },
+        },
+    },
+    Version: square.Int64(int64(1753109537351)),
+}
+response, err := client.TransferOrders.Update(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="transferOrderID" type="string" required>
+  The ID of the transfer order to update.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string" required>
+  A unique string that identifies this UpdateTransferOrder request.
+</ParamField>
+
+<ParamField path="transferOrder" type="UpdateTransferOrderData">
+  The transfer order fields to update.
+</ParamField>
+
+<ParamField path="version" type="int64">
+  Version for optimistic concurrency control.
+</ParamField>
+
+<ResponseField name="transferOrder" type="TransferOrder">
+  The updated transfer order.
+</ResponseField>
+
+### Start Transfer Order
+
+Changes a DRAFT transfer order to STARTED status, decrementing inventory at the source location.
+
+```go transfer_orders.go:16800
+request := &square.StartTransferOrderRequest{
+    TransferOrderID: "transfer_order_id",
+    IdempotencyKey: "EXAMPLE_IDEMPOTENCY_KEY_789",
+    Version: square.Int64(int64(1753109537351)),
+}
+response, err := client.TransferOrders.Start(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="transferOrderID" type="string" required>
+  The ID of the transfer order to start. Must be in DRAFT status.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string" required>
+  A unique string for idempotency.
+</ParamField>
+
+<ParamField path="version" type="int64">
+  Version for optimistic concurrency control.
+</ParamField>
+
+<ResponseField name="transferOrder" type="TransferOrder">
+  The transfer order now in STARTED status.
+</ResponseField>
+
+### Receive Transfer Order
+
+Records receipt of items for a transfer order, supporting partial receiving.
+
+```go transfer_orders.go:16703
+request := &square.ReceiveTransferOrderRequest{
+    TransferOrderID: "transfer_order_id",
+    IdempotencyKey: "EXAMPLE_IDEMPOTENCY_KEY_101",
+    Receipt: &square.TransferOrderGoodsReceipt{
+        LineItems: []*square.TransferOrderGoodsReceiptLineItem{
+            &square.TransferOrderGoodsReceiptLineItem{
+                TransferOrderLineUID: "1",
+                QuantityReceived: square.String("3"),
+                QuantityDamaged: square.String("1"),
+                QuantityCanceled: square.String("1"),
+            },
+        },
+    },
+    Version: square.Int64(int64(1753118664873)),
+}
+response, err := client.TransferOrders.Receive(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="transferOrderID" type="string" required>
+  The ID of the transfer order to receive items for.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string" required>
+  A unique key to make this request idempotent.
+</ParamField>
+
+<ParamField path="receipt.lineItems" type="[]TransferOrderGoodsReceiptLineItem" required>
+  The line items being received with quantities.
+</ParamField>
+
+<ParamField path="receipt.lineItems[].quantityReceived" type="string">
+  Quantity received in good condition (added to destination inventory as IN_STOCK).
+</ParamField>
+
+<ParamField path="receipt.lineItems[].quantityDamaged" type="string">
+  Quantity damaged during transit (added to destination inventory as WASTE).
+</ParamField>
+
+<ParamField path="receipt.lineItems[].quantityCanceled" type="string">
+  Quantity canceled (returned to source location's inventory).
+</ParamField>
+
+<ParamField path="version" type="int64">
+  Version for optimistic concurrency control.
+</ParamField>
+
+<ResponseField name="transferOrder" type="TransferOrder">
+  The updated transfer order with received quantities.
+</ResponseField>
+
+### Cancel Transfer Order
+
+Cancels a transfer order in STARTED or PARTIALLY_RECEIVED status.
+
+```go transfer_orders.go:16580
+request := &square.CancelTransferOrderRequest{
+    TransferOrderID: "transfer_order_id",
+    IdempotencyKey: "65cc0586-3e82-4d08-b524-3885cffd52",
+    Version: square.Int64(int64(1753117449752)),
+}
+response, err := client.TransferOrders.Cancel(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="transferOrderID" type="string" required>
+  The ID of the transfer order to cancel.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string" required>
+  A unique string for idempotency.
+</ParamField>
+
+<ParamField path="version" type="int64">
+  Version for optimistic concurrency control.
+</ParamField>
+
+<ResponseField name="transferOrder" type="TransferOrder">
+  The canceled transfer order.
+</ResponseField>
+
+### Delete Transfer Order
+
+Deletes a transfer order in DRAFT status.
+
+```go transfer_orders.go:16500
+request := &square.DeleteTransferOrdersRequest{
+    TransferOrderID: "transfer_order_id",
+    Version: square.Int64(int64(1000000)),
+}
+response, err := client.TransferOrders.Delete(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="transferOrderID" type="string" required>
+  The ID of the transfer order to delete.
+</ParamField>
+
+<ParamField path="version" type="int64">
+  Version for optimistic concurrency control.
+</ParamField>
+
+## Transfer Order Lifecycle
+
+1. **DRAFT** - Initial state when created. Can be edited or deleted.
+2. **STARTED** - Order is in transit. Inventory is decremented from source.
+3. **PARTIALLY_RECEIVED** - Some items have been received.
+4. **COMPLETED** - All items have been received, damaged, or canceled.
+5. **CANCELED** - Order was canceled before completion.
+
+## Use Cases
+
+### Create and Start Transfer
+
+Create a transfer order and immediately start it:
+
+```go
+// Create transfer order
+createReq := &square.CreateTransferOrderRequest{
+    IdempotencyKey: uuid.New().String(),
+    TransferOrder: &square.CreateTransferOrderData{
+        SourceLocationID: "SOURCE_LOC_ID",
+        DestinationLocationID: "DEST_LOC_ID",
+        LineItems: []*square.CreateTransferOrderLineData{
+            &square.CreateTransferOrderLineData{
+                ItemVariationID: "ITEM_VAR_ID",
+                QuantityOrdered: "10",
+            },
+        },
+    },
+}
+
+createResp, err := client.TransferOrders.Create(context.TODO(), createReq)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Start the transfer
+startReq := &square.StartTransferOrderRequest{
+    TransferOrderID: *createResp.TransferOrder.ID,
+    IdempotencyKey: uuid.New().String(),
+    Version: createResp.TransferOrder.Version,
+}
+
+startResp, err := client.TransferOrders.Start(context.TODO(), startReq)
+```
+
+### Receive Items with Damage
+
+Record receipt with some damaged items:
+
+```go
+request := &square.ReceiveTransferOrderRequest{
+    TransferOrderID: "transfer_order_id",
+    IdempotencyKey: uuid.New().String(),
+    Receipt: &square.TransferOrderGoodsReceipt{
+        LineItems: []*square.TransferOrderGoodsReceiptLineItem{
+            &square.TransferOrderGoodsReceiptLineItem{
+                TransferOrderLineUID: "line_item_uid",
+                QuantityReceived: square.String("8"),  // 8 in good condition
+                QuantityDamaged: square.String("2"),   // 2 damaged
+            },
+        },
+    },
+    Version: square.Int64(currentVersion),
+}
+
+response, err := client.TransferOrders.Receive(context.TODO(), request)
+```
+
+### Search Active Transfers
+
+Find all in-progress transfers for a location:
+
+```go
+request := &square.SearchTransferOrdersRequest{
+    Query: &square.TransferOrderQuery{
+        Filter: &square.TransferOrderFilter{
+            SourceLocationIDs: []string{"LOCATION_ID"},
+            Statuses: []square.TransferOrderStatus{
+                square.TransferOrderStatusStarted,
+                square.TransferOrderStatusPartiallyReceived,
+            },
+        },
+    },
+}
+
+response, err := client.TransferOrders.Search(context.TODO(), request)
+```
+
+## Best Practices
+
+- **Use idempotency keys**: Prevent duplicate transfers with unique keys
+- **Track versions**: Use version numbers for optimistic concurrency control
+- **Handle partial receives**: Support receiving items in multiple batches
+- **Monitor damaged goods**: Track damaged quantities separately
+- **Add tracking numbers**: Include shipment tracking for visibility
+- **Document with notes**: Add context about why transfers are happening
+- **Start when ready**: Keep orders in DRAFT until ready to ship
+
+## Error Handling
+
+```go
+response, err := client.TransferOrders.Create(context.TODO(), request)
+if err != nil {
+    if apiErr, ok := err.(*square.APIError); ok {
+        for _, e := range apiErr.Errors {
+            switch e.Code {
+            case "INSUFFICIENT_INVENTORY":
+                // Source location doesn't have enough inventory
+            case "INVALID_VALUE":
+                // Check source and destination locations are different
+            case "VERSION_MISMATCH":
+                // Reload and retry with current version
+            }
+        }
+    }
+}
+```
+
+## Related Resources
+
+- [Inventory API](/api-reference/inventory)
+- [Locations API](/api-reference/locations)
+- [Vendors API](/api-reference/vendors)

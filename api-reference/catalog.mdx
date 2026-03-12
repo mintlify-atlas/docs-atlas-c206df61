@@ -1,0 +1,461 @@
+---
+title: "Catalog"
+description: "Manage items, variations, and inventory with the Square Go SDK"
+---
+
+The Catalog API lets you create and manage items, including item variations, modifiers, categories, discounts, and taxes for your Square seller account. This API is the foundation for managing your product catalog across all Square integrations.
+
+## Available Methods
+
+The Catalog client provides the following methods:
+
+- `BatchDeleteCatalogObjects` - Delete multiple catalog objects
+- `BatchGetCatalogObjects` - Retrieve multiple catalog objects by ID
+- `BatchUpsertCatalogObjects` - Create or update multiple catalog objects
+- `ListCatalog` - List all catalog objects of specified types
+- `SearchCatalogObjects` - Search for catalog objects with filters
+- `SearchCatalogItems` - Search specifically for catalog items
+- `UpdateItemModifierLists` - Enable or disable modifier lists for items
+- `UpdateItemTaxes` - Enable or disable taxes for items
+
+## Batch Upsert Catalog Objects
+
+Creates or updates up to 10,000 catalog objects atomically. This is the primary method for creating or updating items in your catalog.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BatchUpsertCatalogObjectsRequest{
+        IdempotencyKey: "8193148c-9586-11e6-99f9-28cfe92138cf",
+        Batches: []*square.CatalogObjectBatch{
+            {
+                Objects: []*square.CatalogObject{
+                    {
+                        Type: square.CatalogObjectTypeItem,
+                        ID: "#Coffee",
+                        ItemData: &square.CatalogItem{
+                            Name: "Coffee",
+                            Description: square.String("Hot coffee"),
+                            Variations: []*square.CatalogObject{
+                                {
+                                    Type: square.CatalogObjectTypeItemVariation,
+                                    ID: "#Small",
+                                    ItemVariationData: &square.CatalogItemVariation{
+                                        Name: square.String("Small"),
+                                        ItemID: square.String("#Coffee"),
+                                        PricingType: square.CatalogPricingTypeFixedPricing.Ptr(),
+                                        PriceMoney: &square.Money{
+                                            Amount: square.Int64(250),
+                                            Currency: square.CurrencyUsd.Ptr(),
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+
+    response, err := client.Catalog.BatchUpsertCatalogObjects(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Created %d objects\n", len(response.Objects))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="IdempotencyKey" type="string" required>
+  A value you specify that uniquely identifies this request. See [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency) for more information.
+</ParamField>
+
+<ParamField path="Batches" type="[]*square.CatalogObjectBatch" required>
+  A batch of CatalogObjects to be inserted/updated atomically. Each batch may contain up to 1,000 objects. The total number of objects across all batches for a single request may not exceed 10,000.
+</ParamField>
+
+### Response
+
+<ResponseField name="Objects" type="[]*square.CatalogObject">
+  The successfully created or updated CatalogObjects
+</ResponseField>
+
+<ResponseField name="UpdatedAt" type="*string">
+  The database timestamp of this update in RFC 3339 format
+</ResponseField>
+
+<ResponseField name="IDMappings" type="[]*square.CatalogIDMapping">
+  The mapping between client and server IDs for this upsert
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Batch Get Catalog Objects
+
+Retrieves information about catalog objects by their IDs. Optionally includes related objects referenced by the returned objects.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BatchGetCatalogObjectsRequest{
+        ObjectIDs: []string{
+            "W62UWFY35CWMYGVWK6TWJDNI",
+            "GXNX4EPVWTIEQ6CFKQOAYHVO",
+        },
+        IncludeRelatedObjects: square.Bool(true),
+    }
+
+    response, err := client.Catalog.BatchGetCatalogObjects(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Retrieved %d objects\n", len(response.Objects))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="ObjectIDs" type="[]string" required>
+  The IDs of the CatalogObjects to be retrieved
+</ParamField>
+
+<ParamField path="IncludeRelatedObjects" type="*bool">
+  If true, the response will include additional objects that are related to the requested objects. Default: false
+</ParamField>
+
+<ParamField path="CatalogVersion" type="*int64">
+  The specific version of the catalog objects to be included in the response. If not included, results will be from the current version of the catalog.
+</ParamField>
+
+<ParamField path="IncludeDeletedObjects" type="*bool">
+  Indicates whether to include deleted objects in the response. Default: false
+</ParamField>
+
+<ParamField path="IncludeCategoryPathToRoot" type="*bool">
+  Specifies whether or not to include the path_to_root list for each returned category instance. Default: false
+</ParamField>
+
+### Response
+
+<ResponseField name="Objects" type="[]*square.CatalogObject">
+  A list of CatalogObjects returned
+</ResponseField>
+
+<ResponseField name="RelatedObjects" type="[]*square.CatalogObject">
+  A list of CatalogObjects referenced by the objects in the objects field
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Search Catalog Items
+
+Searches for catalog items or item variations by matching supported search attribute values. This is optimized for searching items specifically.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.SearchCatalogItemsRequest{
+        TextFilter: square.String("coffee"),
+        CategoryIDs: []string{"BJNQCF2FJ6S6XADLX33C3X"},
+        StockLevels: []square.SearchCatalogItemsRequestStockLevel{
+            square.SearchCatalogItemsRequestStockLevelOut,
+            square.SearchCatalogItemsRequestStockLevelLow,
+        },
+        EnabledLocationIDs: []string{"L88917AVBK2S5"},
+        Limit: square.Int(10),
+        SortOrder: square.SortOrderAsc.Ptr(),
+    }
+
+    response, err := client.Catalog.SearchCatalogItems(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Found %d items\n", len(response.Items))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="TextFilter" type="*string">
+  The text filter expression to return items or item variations containing specified text in the name, description, or abbreviation attribute
+</ParamField>
+
+<ParamField path="CategoryIDs" type="[]string">
+  The category IDs to filter by. Returns items containing the specified category IDs.
+</ParamField>
+
+<ParamField path="StockLevels" type="[]square.SearchCatalogItemsRequestStockLevel">
+  The stock-level query expression to return item variations with the specified stock levels
+</ParamField>
+
+<ParamField path="EnabledLocationIDs" type="[]string">
+  The enabled-location query expression to return items and item variations having specified enabled locations
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  The pagination cursor returned in the previous response. Use to fetch the next batch of results.
+</ParamField>
+
+<ParamField path="Limit" type="*int">
+  The maximum number of results to return per page. Default: 100
+</ParamField>
+
+<ParamField path="SortOrder" type="*square.SortOrder">
+  The order to sort the results by item names. Default: ASC
+</ParamField>
+
+<ParamField path="ProductTypes" type="[]square.CatalogItemProductType">
+  The product types query expression to return items or item variations having the specified product types
+</ParamField>
+
+### Response
+
+<ResponseField name="Items" type="[]*square.CatalogObject">
+  The found catalog items
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor for retrieving the next page of results
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## List Catalog
+
+Returns a list of all catalog objects of the specified types. This endpoint allows browsing your entire catalog.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.ListCatalogRequest{
+        Types: square.String("ITEM,CATEGORY"),
+        CatalogVersion: square.Int64(12345),
+    }
+
+    response, err := client.Catalog.ListCatalog(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Retrieved %d catalog objects\n", len(response.Objects))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="Cursor" type="*string">
+  The pagination cursor returned in the previous response. Leave unset for an initial request.
+</ParamField>
+
+<ParamField path="Types" type="*string">
+  An optional case-insensitive, comma-separated list of object types to retrieve, such as ITEM, ITEM_VARIATION, CATEGORY, DISCOUNT, TAX, MODIFIER, MODIFIER_LIST, or IMAGE.
+</ParamField>
+
+<ParamField path="CatalogVersion" type="*int64">
+  The specific version of the catalog objects to be included in the response. If not included, results will be from the current version of the catalog.
+</ParamField>
+
+### Response
+
+<ResponseField name="Objects" type="[]*square.CatalogObject">
+  The CatalogObjects returned
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to be used in the next request
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Update Item Modifier Lists
+
+Updates the modifier lists that apply to a set of items. This allows you to enable or disable modifier lists for multiple items at once.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.UpdateItemModifierListsRequest{
+        ItemIDs: []string{
+            "H42BRLUJ5KTZTTMPVSLFAACQ",
+            "2JXOBJIHCWBQ4NZ3RIXQGJA6",
+        },
+        ModifierListsToEnable: []string{
+            "H42BRLUJ5KTZTTMPVSLFAACQ",
+        },
+        ModifierListsToDisable: []string{
+            "7WRC16CJZDVLSNDQ35PP6YAD",
+        },
+    }
+
+    response, err := client.Catalog.UpdateItemModifierLists(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Updated at: %s\n", response.UpdatedAt)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="ItemIDs" type="[]string" required>
+  The IDs of the catalog items associated with the CatalogModifierList objects being updated
+</ParamField>
+
+<ParamField path="ModifierListsToEnable" type="[]string">
+  The IDs of the CatalogModifierList objects to enable for the CatalogItem. At least one of modifier_lists_to_enable or modifier_lists_to_disable must be specified.
+</ParamField>
+
+<ParamField path="ModifierListsToDisable" type="[]string">
+  The IDs of the CatalogModifierList objects to disable for the CatalogItem. At least one of modifier_lists_to_enable or modifier_lists_to_disable must be specified.
+</ParamField>
+
+### Response
+
+<ResponseField name="UpdatedAt" type="*string">
+  The database timestamp of this update in RFC 3339 format
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Batch Delete Catalog Objects
+
+Deletes a set of catalog objects based on a list of target object IDs. When an object is deleted, other objects in the graph that depend on that object will be deleted as well.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BatchDeleteCatalogObjectsRequest{
+        ObjectIDs: []string{
+            "W62UWFY35CWMYGVWK6TWJDNI",
+            "GXNX4EPVWTIEQ6CFKQOAYHVO",
+        },
+    }
+
+    response, err := client.Catalog.BatchDeleteCatalogObjects(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Deleted %d objects\n", len(response.DeletedObjectIDs))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="ObjectIDs" type="[]string" required>
+  The IDs of the CatalogObjects to be deleted. When an object is deleted, other objects in the graph that depend on that object will be deleted as well.
+</ParamField>
+
+### Response
+
+<ResponseField name="DeletedObjectIDs" type="[]string">
+  The IDs of all CatalogObjects deleted by this request
+</ResponseField>
+
+<ResponseField name="DeletedAt" type="*string">
+  The database timestamp of this deletion in RFC 3339 format
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>

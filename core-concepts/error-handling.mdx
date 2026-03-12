@@ -1,0 +1,168 @@
+---
+title: Error Handling
+description: Learn how to handle errors in the Square Go SDK using structured error types
+---
+
+The Square Go SDK provides structured error handling through the `core.APIError` type, which preserves HTTP status codes and headers from API responses.
+
+## Understanding API Errors
+
+When an API call returns a non-success status code, the SDK wraps the error in a `core.APIError` type that includes:
+
+- **StatusCode**: The HTTP status code from the response
+- **Header**: The HTTP headers from the response
+- **Error message**: The underlying error details
+
+## Checking Error Status Codes
+
+You can check the HTTP status code to handle specific error conditions:
+
+```go
+import (
+    "context"
+    "net/http"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/core"
+)
+
+response, err := client.Payments.Create(
+    context.TODO(),
+    &square.CreatePaymentRequest{
+        IdempotencyKey: "4935a656-a929-4792-b97c-8848be85c27c",
+        SourceID:       "CASH",
+        AmountMoney: &square.Money{
+            Amount:   square.Int64(100),
+            Currency: square.CurrencyUsd.Ptr(),
+        },
+    },
+)
+
+if err != nil {
+    if apiError, ok := err.(*core.APIError); ok {
+        switch (apiError.StatusCode) {
+            case http.StatusUnauthorized:
+                // Handle authentication errors
+                log.Printf("Authentication failed: %v", apiError)
+            case http.StatusBadRequest:
+                // Handle validation errors
+                log.Printf("Invalid request: %v", apiError)
+            case http.StatusTooManyRequests:
+                // Handle rate limiting
+                log.Printf("Rate limited: %v", apiError)
+            default:
+                // Handle other errors
+                log.Printf("API error: %v", apiError)
+        }
+    }
+    return err
+}
+```
+
+## Using errors.As for Type Assertion
+
+The `core.APIError` type is compatible with Go's standard `errors.As` function:
+
+```go
+import "errors"
+
+response, err := client.Payments.Create(ctx, request)
+if err != nil {
+    var apiError *core.APIError
+    if errors.As(err, &apiError) {
+        log.Printf("API error with status %d: %v", apiError.StatusCode, apiError)
+        // Access response headers if needed
+        retryAfter := apiError.Header.Get("Retry-After")
+    }
+    return err
+}
+```
+
+<Note>
+Using `errors.As` is the recommended approach for type assertions in Go, as it works correctly even when errors are wrapped.
+</Note>
+
+## Wrapping Errors
+
+You can wrap API errors with additional context while preserving the ability to unwrap them:
+
+```go
+response, err := client.Payments.Create(ctx, request)
+if err != nil {
+    return fmt.Errorf("failed to create payment: %w", err)
+}
+```
+
+The wrapped error can still be accessed using `errors.As` or `errors.Is`:
+
+```go
+err := processPayment()
+if err != nil {
+    var apiError *core.APIError
+    if errors.As(err, &apiError) {
+        // Successfully unwrapped the API error
+        log.Printf("Original status code: %d", apiError.StatusCode)
+    }
+}
+```
+
+## Common HTTP Status Codes
+
+<AccordionGroup>
+  <Accordion title="400 Bad Request">
+    The request was invalid or malformed. Check your request parameters and body.
+  </Accordion>
+  
+  <Accordion title="401 Unauthorized">
+    Authentication failed. Verify your access token is valid and has the required permissions.
+  </Accordion>
+  
+  <Accordion title="404 Not Found">
+    The requested resource does not exist. Verify the resource ID is correct.
+  </Accordion>
+  
+  <Accordion title="429 Too Many Requests">
+    You've exceeded the rate limit. The SDK automatically retries these requests with exponential backoff.
+  </Accordion>
+  
+  <Accordion title="500 Internal Server Error">
+    Square's servers encountered an error. The SDK automatically retries these requests.
+  </Accordion>
+</AccordionGroup>
+
+## Error Structure
+
+The `core.APIError` type is defined as:
+
+```go
+type APIError struct {
+    StatusCode int         `json:"-"`
+    Header     http.Header `json:"-"`
+    // contains filtered or unexported fields
+}
+```
+
+<Warning>
+Always check for errors after making API calls. Even successful-looking operations can fail due to network issues, validation errors, or server problems.
+</Warning>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always check errors">
+    Never ignore error return values from API calls. Always handle them appropriately.
+  </Step>
+  
+  <Step title="Use type assertions carefully">
+    Use `errors.As` instead of type assertions to handle wrapped errors correctly.
+  </Step>
+  
+  <Step title="Log error details">
+    Include the status code and error message in your logs for easier debugging.
+  </Step>
+  
+  <Step title="Handle retryable errors">
+    The SDK automatically retries certain errors (408, 429, 5XX), but you may want to add additional retry logic for specific use cases.
+  </Step>
+</Steps>

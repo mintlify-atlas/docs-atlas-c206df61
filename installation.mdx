@@ -1,0 +1,117 @@
+---
+title: "Installation"
+description: "Learn how to install and set up the Square Go SDK in your project"
+---
+
+## Requirements
+
+The Square Go SDK requires:
+
+- **Go version 1.18 or higher**
+- A Square account with API credentials
+
+<Note>
+  The SDK is built with Go 1.21 but maintains compatibility with Go 1.18+. If you're using Go modules (recommended), the toolchain will handle version requirements automatically.
+</Note>
+
+## Install the SDK
+
+<Steps>
+  <Step title="Add the SDK to your project">
+    Run the following command in your project directory to install the Square Go SDK:
+
+    ```bash
+    go get github.com/square/square-go-sdk
+    ```
+
+    This will download the latest version of the SDK and add it to your `go.mod` file.
+  </Step>
+
+  <Step title="Verify the installation">
+    After installation, your `go.mod` file should include an entry similar to:
+
+    ```go
+    require github.com/square/square-go-sdk/v3 v3.x.x
+    ```
+
+    The SDK uses semantic versioning, and the `/v3` path indicates you're using version 3 of the SDK.
+  </Step>
+
+  <Step title="Import the SDK in your code">
+    Import the necessary packages in your Go files:
+
+    ```go
+    import (
+        "github.com/square/square-go-sdk"
+        squareclient "github.com/square/square-go-sdk/client"
+        "github.com/square/square-go-sdk/option"
+    )
+    ```
+  </Step>
+</Steps>
+
+## Package Structure
+
+The Square Go SDK is organized into several packages:
+
+- **`github.com/square/square-go-sdk`** - Core types and models
+- **`github.com/square/square-go-sdk/client`** - Main client for API access
+- **`github.com/square/square-go-sdk/option`** - Request configuration options
+- **`github.com/square/square-go-sdk/payments`** - Payments API client
+- **`github.com/square/square-go-sdk/customers`** - Customers API client
+- **`github.com/square/square-go-sdk/orders`** - Orders API client
+- And many more for each Square API resource...
+
+<Note>
+  Most use cases only require importing the main `square`, `squareclient`, and `option` packages. Resource-specific packages are automatically available through the main client.
+</Note>
+
+## Version Management
+
+### Installing a Specific Version
+
+To install a specific version of the SDK:
+
+```bash
+go get github.com/square/square-go-sdk@v3.2.0
+```
+
+### Updating to the Latest Version
+
+To update to the latest version:
+
+```bash
+go get -u github.com/square/square-go-sdk
+```
+
+### Checking Your Current Version
+
+View your installed version in the `go.mod` file or run:
+
+```bash
+go list -m github.com/square/square-go-sdk/v3
+```
+
+## Dependencies
+
+The SDK has minimal external dependencies:
+
+- **`github.com/google/uuid`** - For generating unique identifiers
+- Standard Go libraries
+
+All dependencies are managed automatically through Go modules.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Create your first payment in under 5 minutes
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Learn how to configure API credentials
+  </Card>
+</CardGroup>
+
+<Warning>
+  Make sure you have obtained your Square API credentials from the [Square Developer Dashboard](https://developer.squareup.com/apps) before proceeding to the quickstart.
+</Warning>

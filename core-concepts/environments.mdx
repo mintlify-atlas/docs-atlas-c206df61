@@ -1,0 +1,300 @@
+---
+title: Environments
+description: Learn how to switch between Square's sandbox and production environments
+---
+
+Square provides separate sandbox and production environments for testing and live operations. The Square Go SDK makes it easy to switch between environments using the `square.Environments` configuration.
+
+## Available Environments
+
+The SDK supports two environments:
+
+<CardGroup cols={2}>
+  <Card title="Production" icon="building">
+    **URL:** `https://connect.squareup.com`
+    
+    Used for live transactions with real money and customer data.
+  </Card>
+  
+  <Card title="Sandbox" icon="flask">
+    **URL:** `https://connect.squareupsandbox.com`
+    
+    Used for testing and development with simulated transactions.
+  </Card>
+</CardGroup>
+
+## Default Environment
+
+By default, the SDK uses the **production** environment:
+
+```go
+import (
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+// Uses production environment by default
+client := squareclient.NewClient(
+    option.WithToken("YOUR_PRODUCTION_ACCESS_TOKEN"),
+)
+```
+
+<Warning>
+Make sure you're using the correct environment for your use case. Test transactions in production will use real money!
+</Warning>
+
+## Switching to Sandbox
+
+To use the sandbox environment, specify it when creating the client:
+
+```go
+import "github.com/square/square-go-sdk"
+
+client := squareclient.NewClient(
+    option.WithBaseURL(square.Environments.Sandbox),
+    option.WithToken("YOUR_SANDBOX_ACCESS_TOKEN"),
+)
+```
+
+<Note>
+Sandbox and production have separate access tokens. Make sure you're using the correct token for each environment.
+</Note>
+
+## Environment Configuration
+
+The `square.Environments` variable is defined as:
+
+```go
+// From environments.go
+var Environments = struct {
+    Production string
+    Sandbox    string
+}{
+    Production: "https://connect.squareup.com",
+    Sandbox:    "https://connect.squareupsandbox.com",
+}
+```
+
+You can use these constants to ensure you're using the correct URL:
+
+```go
+// Explicit production
+client := squareclient.NewClient(
+    option.WithBaseURL(square.Environments.Production),
+    option.WithToken(token),
+)
+
+// Explicit sandbox
+client := squareclient.NewClient(
+    option.WithBaseURL(square.Environments.Sandbox),
+    option.WithToken(token),
+)
+```
+
+## Using Environment Variables
+
+For easier configuration management, use environment variables:
+
+```go
+import "os"
+
+func NewSquareClient() *squareclient.Client {
+    env := os.Getenv("SQUARE_ENVIRONMENT") // "production" or "sandbox"
+    token := os.Getenv("SQUARE_ACCESS_TOKEN")
+    
+    var baseURL string
+    if env == "sandbox" {
+        baseURL = square.Environments.Sandbox
+    } else {
+        baseURL = square.Environments.Production
+    }
+    
+    return squareclient.NewClient(
+        option.WithBaseURL(baseURL),
+        option.WithToken(token),
+    )
+}
+```
+
+## Custom Base URLs
+
+You can also specify custom base URLs for testing or proxy scenarios:
+
+```go
+// Use a custom URL (e.g., for testing)
+client := squareclient.NewClient(
+    option.WithBaseURL("https://example.com"),
+    option.WithToken(token),
+)
+```
+
+This is particularly useful for:
+
+- **Local testing**: Point to a local mock server
+- **Proxy servers**: Route requests through a proxy
+- **Custom environments**: Connect to internal testing environments
+
+### Example: Local Mock Server
+
+```go
+import "testing"
+
+func TestPaymentCreation(t *testing.T) {
+    // Point to local mock server
+    client := squareclient.NewClient(
+        option.WithBaseURL("http://localhost:8080"),
+        option.WithToken("test-token"),
+    )
+    
+    response, err := client.Payments.Create(
+        context.TODO(),
+        &square.CreatePaymentRequest{
+            IdempotencyKey: "test-key",
+            SourceID:       "CASH",
+            AmountMoney: &square.Money{
+                Amount:   square.Int64(100),
+                Currency: square.CurrencyUsd.Ptr(),
+            },
+        },
+    )
+    
+    if err != nil {
+        t.Fatalf("Failed to create payment: %v", err)
+    }
+}
+```
+
+## Sandbox vs Production Differences
+
+<Tabs>
+  <Tab title="Data Isolation">
+    Sandbox and production maintain completely separate data:
+    
+    - Different customer accounts
+    - Different merchant locations
+    - Different payment methods
+    - Different catalog items
+    
+    **You cannot access production data from sandbox, or vice versa.**
+  </Tab>
+  
+  <Tab title="Access Tokens">
+    Each environment requires its own access token:
+    
+    - **Production tokens**: Obtained from the production Square Dashboard
+    - **Sandbox tokens**: Obtained from the sandbox Square Dashboard
+    
+    A production token will not work in sandbox, and sandbox tokens won't work in production.
+  </Tab>
+  
+  <Tab title="Testing Features">
+    Sandbox provides special testing features:
+    
+    - Test credit card numbers
+    - Simulated payment failures
+    - Fast-forwarded subscriptions
+    - Webhook testing
+    
+    These features are not available in production.
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use sandbox for all testing">
+    Always develop and test in sandbox before deploying to production.
+  </Step>
+  
+  <Step title="Keep tokens separate">
+    Store production and sandbox tokens separately and never commit them to version control.
+  </Step>
+  
+  <Step title="Use environment variables">
+    Configure environments through environment variables for easier deployment.
+  </Step>
+  
+  <Step title="Validate the environment">
+    Add checks to ensure you're using the correct environment for your operations.
+  </Step>
+  
+  <Step title="Test environment switching">
+    Verify your application can switch between environments without code changes.
+  </Step>
+</Steps>
+
+## Example: Environment-Aware Client Factory
+
+```go
+package square
+
+import (
+    "fmt"
+    "os"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+type Environment string
+
+const (
+    EnvProduction Environment = "production"
+    EnvSandbox    Environment = "sandbox"
+)
+
+type ClientConfig struct {
+    Environment Environment
+    AccessToken string
+}
+
+func NewClient(config ClientConfig) (*squareclient.Client, error) {
+    if config.AccessToken == "" {
+        return nil, fmt.Errorf("access token is required")
+    }
+    
+    var baseURL string
+    switch config.Environment {
+    case EnvSandbox:
+        baseURL = square.Environments.Sandbox
+    case EnvProduction:
+        baseURL = square.Environments.Production
+    default:
+        return nil, fmt.Errorf("invalid environment: %s", config.Environment)
+    }
+    
+    return squareclient.NewClient(
+        option.WithBaseURL(baseURL),
+        option.WithToken(config.AccessToken),
+    ), nil
+}
+
+func NewClientFromEnv() (*squareclient.Client, error) {
+    env := os.Getenv("SQUARE_ENVIRONMENT")
+    if env == "" {
+        env = string(EnvProduction)
+    }
+    
+    return NewClient(ClientConfig{
+        Environment: Environment(env),
+        AccessToken: os.Getenv("SQUARE_ACCESS_TOKEN"),
+    })
+}
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="401 Unauthorized Error">
+    Ensure you're using the correct access token for your environment. Sandbox tokens won't work in production and vice versa.
+  </Accordion>
+  
+  <Accordion title="404 Resource Not Found">
+    The resource may exist in one environment but not the other. Check that you're querying the correct environment.
+  </Accordion>
+  
+  <Accordion title="Different Behavior in Sandbox">
+    Some features behave differently in sandbox for testing purposes. Consult the Square documentation for sandbox-specific behavior.
+  </Accordion>
+</AccordionGroup>

@@ -1,122 +1,155 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "Square Go SDK",
+  "theme": "sequoia",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#040404",
+    "light": "#040404",
+    "dark": "#040404"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/9a2e2a3a-6c27-48db-a12b-4a151259e512.png",
+  "logo": {
+    "light": "/logo.png",
+    "dark": "/logo.png"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/square/square-go-sdk"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/square/square-go-sdk"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
             "pages": [
-              "index",
+              "introduction",
+              "installation",
               "quickstart",
-              "development"
+              "authentication"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "core-concepts/error-handling",
+              "core-concepts/pagination",
+              "core-concepts/retries",
+              "core-concepts/environments",
+              "core-concepts/timeouts",
+              "core-concepts/request-options",
+              "core-concepts/webhooks"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Advanced",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "advanced/extra-properties",
+              "advanced/custom-http-client"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Overview",
             "pages": [
-              "api-reference/introduction"
+              "api-reference/overview",
+              "api-reference/client"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Payments",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api-reference/payments",
+              "api-reference/refunds",
+              "api-reference/checkout",
+              "api-reference/cards",
+              "api-reference/apple-pay",
+              "api-reference/bank-accounts",
+              "api-reference/payouts",
+              "api-reference/disputes"
+            ]
+          },
+          {
+            "group": "Commerce",
+            "pages": [
+              "api-reference/orders",
+              "api-reference/catalog",
+              "api-reference/inventory",
+              "api-reference/subscriptions",
+              "api-reference/invoices"
+            ]
+          },
+          {
+            "group": "Customers",
+            "pages": [
+              "api-reference/customers",
+              "api-reference/loyalty",
+              "api-reference/gift-cards"
+            ]
+          },
+          {
+            "group": "Business",
+            "pages": [
+              "api-reference/locations",
+              "api-reference/merchants",
+              "api-reference/devices",
+              "api-reference/sites",
+              "api-reference/snippets",
+              "api-reference/channels"
+            ]
+          },
+          {
+            "group": "Team",
+            "pages": [
+              "api-reference/team",
+              "api-reference/team-members",
+              "api-reference/labor",
+              "api-reference/employees"
+            ]
+          },
+          {
+            "group": "Point of Sale",
+            "pages": [
+              "api-reference/terminal",
+              "api-reference/cash-drawers"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "api-reference/oauth",
+              "api-reference/webhooks-api",
+              "api-reference/events",
+              "api-reference/vendors",
+              "api-reference/transfer-orders"
+            ]
+          },
+          {
+            "group": "Legacy",
+            "pages": [
+              "api-reference/v1-transactions"
+            ]
+          },
+          {
+            "group": "Bookings",
+            "pages": [
+              "api-reference/bookings"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

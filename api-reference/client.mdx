@@ -1,0 +1,525 @@
+---
+title: "Client"
+description: "Main Square Go SDK client initialization and configuration"
+---
+
+## Overview
+
+The `Client` type is the entry point for all Square API operations. It provides access to all resource-specific API clients and manages shared configuration like authentication, base URL, and HTTP client settings.
+
+## Client Structure
+
+The Client type is defined in `client/client.go`:
+
+```go
+type Client struct {
+    OAuth          *oauth.Client
+    V1Transactions *v1transactions.Client
+    ApplePay       *applepay.Client
+    BankAccounts   *bankaccounts.Client
+    Bookings       *client.Client
+    Cards          *cards.Client
+    Catalog        *catalogclient.Client
+    Channels       *channels.Client
+    Customers      *customersclient.Client
+    Devices        *devicesclient.Client
+    Disputes       *disputesclient.Client
+    Employees      *employees.Client
+    Events         *events.Client
+    GiftCards      *giftcardsclient.Client
+    Inventory      *inventory.Client
+    Invoices       *invoices.Client
+    Labor          *laborclient.Client
+    Locations      *locationsclient.Client
+    Loyalty        *loyaltyclient.Client
+    Merchants      *merchantsclient.Client
+    Checkout       *checkoutclient.Client
+    Orders         *ordersclient.Client
+    Payments       *payments.Client
+    Payouts        *payouts.Client
+    Refunds        *refunds.Client
+    Sites          *sites.Client
+    Snippets       *snippets.Client
+    Subscriptions  *subscriptions.Client
+    TeamMembers    *teammembersclient.Client
+    Team           *team.Client
+    Terminal       *terminalclient.Client
+    TransferOrders *transferorders.Client
+    Vendors        *vendors.Client
+    CashDrawers    *cashdrawersclient.Client
+    Webhooks       *webhooksclient.Client
+}
+```
+
+## Creating a Client
+
+### NewClient Function
+
+The `NewClient` function creates and initializes a new Square API client.
+
+```go
+func NewClient(opts ...option.RequestOption) *Client
+```
+
+#### Basic Usage
+
+```go
+import (
+    "github.com/square/square-go-sdk/v3/client"
+    "github.com/square/square-go-sdk/v3/option"
+)
+
+// Create client with access token
+client := client.NewClient(
+    option.WithToken("your-access-token"),
+)
+```
+
+#### Environment Variables
+
+The client automatically reads configuration from environment variables if options are not provided:
+
+```go
+// Set environment variables
+// SQUARE_TOKEN=your-access-token
+// VERSION=2026-01-22
+
+// Client will use environment variables
+client := client.NewClient()
+```
+
+<Note>
+The `NewClient` function checks for the `SQUARE_TOKEN` environment variable if no token is provided via options. It also checks for the `VERSION` environment variable to set the API version.
+</Note>
+
+## Configuration Options
+
+The client accepts various configuration options via the `option.RequestOption` interface. These options can be passed to `NewClient` or to individual API methods.
+
+### Authentication
+
+<ParamField path="WithToken" type="func(string) *TokenOption">
+  Sets the access token for authentication. The token is sent as a Bearer token in the Authorization header.
+  
+  ```go
+  client := client.NewClient(
+      option.WithToken("sq0atp-xxxxx"),
+  )
+  ```
+</ParamField>
+
+### Base URL
+
+<ParamField path="WithBaseURL" type="func(string) *BaseURLOption">
+  Overrides the default base URL for API requests. Useful for testing or using different Square environments.
+  
+  ```go
+  client := client.NewClient(
+      option.WithBaseURL("https://connect.squareupsandbox.com"),
+  )
+  ```
+</ParamField>
+
+### HTTP Client
+
+<ParamField path="WithHTTPClient" type="func(HTTPClient) *HTTPClientOption">
+  Provides a custom HTTP client for making requests. Useful for adding custom transport, timeouts, or middleware.
+  
+  ```go
+  import "net/http"
+  
+  httpClient := &http.Client{
+      Timeout: 30 * time.Second,
+  }
+  
+  client := client.NewClient(
+      option.WithHTTPClient(httpClient),
+  )
+  ```
+</ParamField>
+
+### Retry Configuration
+
+<ParamField path="WithMaxAttempts" type="func(uint) *MaxAttemptsOption">
+  Configures the maximum number of retry attempts for failed requests.
+  
+  ```go
+  client := client.NewClient(
+      option.WithMaxAttempts(3),
+  )
+  ```
+</ParamField>
+
+### Request Headers
+
+<ParamField path="WithHTTPHeader" type="func(http.Header) *HTTPHeaderOption">
+  Adds custom HTTP headers to all requests.
+  
+  ```go
+  import "net/http"
+  
+  headers := http.Header{}
+  headers.Set("X-Custom-Header", "value")
+  
+  client := client.NewClient(
+      option.WithHTTPHeader(headers),
+  )
+  ```
+</ParamField>
+
+### Query Parameters
+
+<ParamField path="WithQueryParameters" type="func(url.Values) *QueryParametersOption">
+  Adds custom query parameters to all requests.
+  
+  ```go
+  import "net/url"
+  
+  params := url.Values{}
+  params.Set("custom", "value")
+  
+  client := client.NewClient(
+      option.WithQueryParameters(params),
+  )
+  ```
+</ParamField>
+
+### Body Properties
+
+<ParamField path="WithBodyProperties" type="func(map[string]interface{}) *BodyPropertiesOption">
+  Adds custom properties to request bodies.
+  
+  ```go
+  client := client.NewClient(
+      option.WithBodyProperties(map[string]interface{}{
+          "custom_field": "value",
+      }),
+  )
+  ```
+</ParamField>
+
+## Complete Configuration Example
+
+```go
+import (
+    "net/http"
+    "time"
+    "github.com/square/square-go-sdk/v3/client"
+    "github.com/square/square-go-sdk/v3/option"
+)
+
+func main() {
+    // Create a custom HTTP client with timeout
+    httpClient := &http.Client{
+        Timeout: 30 * time.Second,
+    }
+    
+    // Create Square client with multiple options
+    client := client.NewClient(
+        option.WithToken("sq0atp-xxxxx"),
+        option.WithHTTPClient(httpClient),
+        option.WithMaxAttempts(3),
+    )
+    
+    // Client is now ready to use
+    // All resource clients are automatically initialized
+}
+```
+
+## Accessing Resource Clients
+
+Once you've created a client, you can access any of the resource-specific clients:
+
+### Payments & Transactions
+
+```go
+// Process payments
+client.Payments.Create(ctx, request)
+client.Payments.Get(ctx, request)
+client.Payments.List(ctx, request)
+
+// Handle refunds
+client.Refunds.Create(ctx, request)
+client.Refunds.Get(ctx, request)
+
+// Online checkout
+client.Checkout.CreatePaymentLink(ctx, request)
+
+// Terminal operations
+client.Terminal.Actions.Create(ctx, request)
+client.Terminal.Checkouts.Create(ctx, request)
+```
+
+### Customer Management
+
+```go
+// Customer profiles
+client.Customers.Create(ctx, request)
+client.Customers.Get(ctx, request)
+client.Customers.List(ctx, request)
+client.Customers.Update(ctx, request)
+
+// Customer segments
+client.Customers.Segments.List(ctx, request)
+
+// Customer cards
+client.Customers.Cards.List(ctx, request)
+
+// Loyalty programs
+client.Loyalty.Accounts.Create(ctx, request)
+```
+
+### Catalog & Inventory
+
+```go
+// Catalog items
+client.Catalog.Items.Create(ctx, request)
+client.Catalog.Items.List(ctx, request)
+
+// Inventory tracking
+client.Inventory.BatchChange(ctx, request)
+client.Inventory.RetrieveCounts(ctx, request)
+```
+
+### Orders & Invoices
+
+```go
+// Order management
+client.Orders.Create(ctx, request)
+client.Orders.Calculate(ctx, request)
+client.Orders.Update(ctx, request)
+
+// Invoice operations
+client.Invoices.Create(ctx, request)
+client.Invoices.Publish(ctx, request)
+```
+
+### Business Operations
+
+```go
+// Locations
+client.Locations.List(ctx, request)
+client.Locations.Get(ctx, request)
+
+// Merchants
+client.Merchants.Get(ctx, request)
+
+// Team members
+client.TeamMembers.Create(ctx, request)
+client.TeamMembers.List(ctx, request)
+
+// Labor management
+client.Labor.Shifts.Create(ctx, request)
+client.Labor.Shifts.Search(ctx, request)
+```
+
+## Per-Request Options
+
+You can override client-level configuration for individual requests:
+
+```go
+import (
+    "context"
+    "net/http"
+    "github.com/square/square-go-sdk/v3/option"
+)
+
+ctx := context.Background()
+
+// Override token for this request only
+response, err := client.Payments.Create(
+    ctx,
+    request,
+    option.WithToken("different-token"),
+)
+
+// Add custom headers for this request
+headers := http.Header{}
+headers.Set("X-Request-ID", "unique-id")
+
+response, err := client.Customers.Get(
+    ctx,
+    request,
+    option.WithHTTPHeader(headers),
+)
+```
+
+## Resource Client Features
+
+All resource clients share common features:
+
+### Context Support
+
+Every method accepts a `context.Context` for cancellation and timeout control:
+
+```go
+import (
+    "context"
+    "time"
+)
+
+// Create a context with timeout
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+// Request will be cancelled after 10 seconds
+response, err := client.Payments.Create(ctx, request)
+```
+
+### Raw Response Access
+
+Each client provides a `WithRawResponse` variant for accessing full HTTP responses:
+
+```go
+// Get the full HTTP response
+rawResponse, err := client.Payments.WithRawResponse.Create(ctx, request)
+if err != nil {
+    return err
+}
+
+// Access response body
+payment := rawResponse.Body
+
+// Access HTTP status code
+statusCode := rawResponse.StatusCode
+
+// Access response headers
+headers := rawResponse.Headers
+```
+
+### Nested Clients
+
+Some resource clients have nested sub-clients for related operations:
+
+```go
+// Customers client has nested sub-clients
+client.Customers.Cards.List(ctx, request)
+client.Customers.Groups.List(ctx, request)
+client.Customers.Segments.List(ctx, request)
+client.Customers.CustomAttributes.List(ctx, request)
+
+// Terminal client has nested sub-clients
+client.Terminal.Actions.Create(ctx, request)
+client.Terminal.Checkouts.Create(ctx, request)
+client.Terminal.Refunds.Create(ctx, request)
+
+// Catalog client has nested sub-clients
+client.Catalog.Items.Create(ctx, request)
+client.Catalog.Categories.List(ctx, request)
+```
+
+## Best Practices
+
+### 1. Reuse Client Instances
+
+Create a single client instance and reuse it throughout your application:
+
+```go
+// Good: Create once, use everywhere
+var squareClient *client.Client
+
+func init() {
+    squareClient = client.NewClient(
+        option.WithToken(os.Getenv("SQUARE_TOKEN")),
+    )
+}
+```
+
+### 2. Use Environment Variables for Secrets
+
+Never hardcode access tokens:
+
+```go
+// Good: Use environment variables
+client := client.NewClient(
+    option.WithToken(os.Getenv("SQUARE_TOKEN")),
+)
+
+// Bad: Hardcoded token
+client := client.NewClient(
+    option.WithToken("sq0atp-xxxxx"), // Don't do this!
+)
+```
+
+### 3. Configure Timeouts
+
+Always set appropriate timeouts:
+
+```go
+import (
+    "context"
+    "net/http"
+    "time"
+)
+
+// Configure HTTP client timeout
+httpClient := &http.Client{
+    Timeout: 30 * time.Second,
+}
+
+client := client.NewClient(
+    option.WithHTTPClient(httpClient),
+)
+
+// Use context timeouts for individual requests
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+defer cancel()
+
+response, err := client.Payments.Create(ctx, request)
+```
+
+### 4. Handle Errors Appropriately
+
+Always check and handle errors:
+
+```go
+response, err := client.Payments.Create(ctx, request)
+if err != nil {
+    // Log and handle the error
+    log.Printf("Failed to create payment: %v", err)
+    return nil, err
+}
+
+return response, nil
+```
+
+## Thread Safety
+
+The Square Go SDK client is safe for concurrent use by multiple goroutines. You can use a single client instance across your entire application:
+
+```go
+var client *client.Client
+
+func init() {
+    client = client.NewClient(
+        option.WithToken(os.Getenv("SQUARE_TOKEN")),
+    )
+}
+
+func handler1() {
+    // Safe to use client concurrently
+    client.Payments.Create(ctx, request)
+}
+
+func handler2() {
+    // Safe to use client concurrently
+    client.Customers.Get(ctx, request)
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/authentication">
+    Learn about OAuth and access token management
+  </Card>
+  <Card title="Payments API" href="/api-reference/payments">
+    Start processing payments
+  </Card>
+  <Card title="Customers API" href="/api-reference/customers">
+    Manage customer data
+  </Card>
+  <Card title="Error Handling" href="/guides/error-handling">
+    Handle errors and edge cases
+  </Card>
+</CardGroup>

@@ -1,0 +1,258 @@
+---
+title: Automatic Retries
+description: Understand how the Square Go SDK automatically retries failed requests with exponential backoff
+---
+
+The Square Go SDK automatically retries failed requests using exponential backoff with jitter, making your application more resilient to transient network failures and server errors.
+
+## How Retries Work
+
+Requests are automatically retried when the following HTTP status codes are returned:
+
+- **408 Request Timeout**: The server timed out waiting for the request
+- **429 Too Many Requests**: Rate limit exceeded
+- **5XX Server Errors**: Internal server errors (500, 502, 503, 504, etc.)
+
+<Note>
+The default retry limit is **2 attempts**, meaning each request can be tried up to 3 times total (1 initial attempt + 2 retries).
+</Note>
+
+## Retry Strategy
+
+The SDK uses a sophisticated retry strategy:
+
+1. **Exponential Backoff**: Delay doubles after each retry (1s, 2s, 4s, 8s, etc.)
+2. **Jitter**: Random variation (±10%) prevents thundering herd problems
+3. **Max Delay**: Capped at 60 seconds to prevent excessive waiting
+4. **Min Delay**: Minimum 1 second between retries
+5. **Header-Based Delays**: Respects `Retry-After` and `X-RateLimit-Reset` headers
+
+## Configuring Retries Globally
+
+Set the maximum number of retry attempts when creating the client:
+
+```go
+import (
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+// Configure client to retry up to 5 times
+client := squareclient.NewClient(
+    option.WithToken("YOUR_ACCESS_TOKEN"),
+    option.WithMaxAttempts(5),
+)
+```
+
+### Disabling Retries
+
+To disable retries entirely, set max attempts to 1:
+
+```go
+client := squareclient.NewClient(
+    option.WithToken("YOUR_ACCESS_TOKEN"),
+    option.WithMaxAttempts(1), // No retries
+)
+```
+
+## Configuring Retries Per Request
+
+Override retry behavior for individual requests:
+
+```go
+import "context"
+
+response, err := client.Payments.List(
+    context.TODO(),
+    &square.ListPaymentsRequest{
+        Total: square.Int64(100),
+    },
+    option.WithMaxAttempts(1), // Disable retries for this request
+)
+```
+
+This is useful for operations that should fail fast:
+
+```go
+// Critical operation that needs immediate feedback
+response, err := client.Payments.Create(
+    ctx,
+    request,
+    option.WithMaxAttempts(1), // Don't retry
+)
+if err != nil {
+    // Handle error immediately without retries
+    return err
+}
+```
+
+## Retry Delay Calculation
+
+<Tabs>
+  <Tab title="Exponential Backoff">
+    When no retry headers are present, the SDK uses exponential backoff:
+    
+    ```
+    delay = min(max_delay, min_delay * 2^attempt)
+    jittered_delay = delay * (0.9 + random(0, 0.2))
+    ```
+    
+    **Example delays:**
+    - Retry 1: ~1 second (1s ± 10%)
+    - Retry 2: ~2 seconds (2s ± 10%)
+    - Retry 3: ~4 seconds (4s ± 10%)
+    - Retry 4: ~8 seconds (8s ± 10%)
+    - Retry 5: ~16 seconds (16s ± 10%)
+  </Tab>
+  
+  <Tab title="Retry-After Header">
+    If the server includes a `Retry-After` header, the SDK uses that value:
+    
+    ```go
+    // Server response includes:
+    // Retry-After: 30
+    // SDK will wait 30 seconds before retrying
+    ```
+    
+    The header can be either:
+    - Number of seconds: `Retry-After: 30`
+    - HTTP date: `Retry-After: Wed, 21 Oct 2025 07:28:00 GMT`
+  </Tab>
+  
+  <Tab title="Rate Limit Header">
+    For rate limit errors, the SDK respects the `X-RateLimit-Reset` header:
+    
+    ```go
+    // Server response includes:
+    // X-RateLimit-Reset: 1698765432
+    // SDK waits until that Unix timestamp
+    ```
+    
+    A small amount of jitter (+0% to +20%) is added to spread out retries.
+  </Tab>
+</Tabs>
+
+## Implementation Details
+
+The retry logic is implemented in the `internal.Retrier` type:
+
+```go
+// From internal/retrier.go
+const (
+    defaultRetryAttempts = 2
+    minRetryDelay        = 1000 * time.Millisecond
+    maxRetryDelay        = 60000 * time.Millisecond
+)
+
+func (r *Retrier) shouldRetry(response *http.Response) bool {
+    return response.StatusCode == http.StatusTooManyRequests ||
+        response.StatusCode == http.StatusRequestTimeout ||
+        response.StatusCode >= http.StatusInternalServerError
+}
+```
+
+## Context and Cancellation
+
+Retries respect context cancellation:
+
+```go
+import "time"
+
+// Set a timeout for the entire operation (including retries)
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+response, err := client.Payments.Create(ctx, request)
+if err != nil {
+    if err == context.DeadlineExceeded {
+        log.Println("Operation timed out after retries")
+    }
+    return err
+}
+```
+
+<Warning>
+If the context is cancelled during a retry delay, the operation will stop immediately and return `context.Canceled`.
+</Warning>
+
+## Request Body Handling
+
+The SDK automatically resets the request body before each retry:
+
+```go
+// From internal/retrier.go
+if retryAttempt > 0 && request.GetBody != nil {
+    requestBody, err := request.GetBody()
+    if err != nil {
+        return nil, err
+    }
+    request.Body = requestBody
+}
+```
+
+This ensures that retries work correctly even with streaming request bodies.
+
+## Best Practices
+
+<Steps>
+  <Step title="Use default retries for most operations">
+    The default retry configuration (2 attempts) works well for most use cases.
+  </Step>
+  
+  <Step title="Increase retries for critical operations">
+    For important operations that can tolerate longer waits, increase max attempts to 5 or more.
+  </Step>
+  
+  <Step title="Disable retries for time-sensitive operations">
+    Use `option.WithMaxAttempts(1)` for operations that need immediate feedback.
+  </Step>
+  
+  <Step title="Set appropriate timeouts">
+    Always use context with timeout to prevent indefinite retrying.
+  </Step>
+  
+  <Step title="Monitor retry behavior">
+    Log or monitor how often retries occur to identify underlying issues.
+  </Step>
+</Steps>
+
+## Idempotency Considerations
+
+Always use idempotency keys for operations that modify state:
+
+```go
+import "github.com/google/uuid"
+
+response, err := client.Payments.Create(
+    ctx,
+    &square.CreatePaymentRequest{
+        IdempotencyKey: uuid.New().String(), // Ensures safe retries
+        SourceID:       "CASH",
+        AmountMoney: &square.Money{
+            Amount:   square.Int64(100),
+            Currency: square.CurrencyUsd.Ptr(),
+        },
+    },
+)
+```
+
+<Note>
+Idempotency keys ensure that if a request is retried due to a network failure, the operation won't be duplicated on the server.
+</Note>
+
+## When Retries Don't Help
+
+Retries are **not** attempted for:
+
+- **4XX errors** (except 408 and 429): These indicate client errors that won't be fixed by retrying
+- **Authentication errors** (401): Invalid credentials need to be corrected
+- **Validation errors** (400): The request data needs to be fixed
+- **Not found errors** (404): The resource doesn't exist
+
+```go
+response, err := client.Payments.Get(ctx, "invalid-id")
+if err != nil {
+    // 404 errors are not retried - fails immediately
+    return err
+}
+```

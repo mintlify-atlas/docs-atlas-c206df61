@@ -1,0 +1,370 @@
+---
+title: Timeouts
+description: Learn how to configure request timeouts using Go's context package
+---
+
+The Square Go SDK uses Go's standard `context` package for timeout management, giving you fine-grained control over request timeouts and cancellation.
+
+## Setting Request Timeouts
+
+Use `context.WithTimeout` to set a timeout for individual API calls:
+
+```go
+import (
+    "context"
+    "time"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+)
+
+client := squareclient.NewClient(
+    option.WithToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Set a 1-second timeout for this request
+ctx, cancel := context.WithTimeout(context.TODO(), time.Second)
+defer cancel()
+
+response, err := client.Payments.List(
+    ctx,
+    &square.ListPaymentsRequest{
+        Total: square.Int64(100),
+    },
+)
+if err != nil {
+    if err == context.DeadlineExceeded {
+        // Request timed out
+        log.Println("Request timed out after 1 second")
+    }
+    return err
+}
+```
+
+<Note>
+Always call `defer cancel()` after creating a context with timeout to release resources when the function returns.
+</Note>
+
+## Default Timeout Behavior
+
+By default, the SDK uses `http.DefaultClient`, which has **no timeout**. This means requests will wait indefinitely for a response.
+
+<Warning>
+For production applications, always configure timeouts using either context-based timeouts or a custom HTTP client with a timeout.
+</Warning>
+
+## Configuring a Global HTTP Client Timeout
+
+Set a timeout on the HTTP client used by the SDK:
+
+```go
+import (
+    "net/http"
+    "time"
+    
+    "github.com/square/square-go-sdk/option"
+)
+
+client := squareclient.NewClient(
+    option.WithToken("YOUR_ACCESS_TOKEN"),
+    option.WithHTTPClient(
+        &http.Client{
+            Timeout: 5 * time.Second,
+        },
+    ),
+)
+```
+
+This sets a 5-second timeout for all requests made by this client.
+
+## Per-Request vs Global Timeouts
+
+<Tabs>
+  <Tab title="Per-Request Timeouts">
+    Use context for request-specific timeouts:
+    
+    ```go
+    // Short timeout for health check
+    ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+    defer cancel()
+    response, err := client.Locations.List(ctx, request)
+    
+    // Longer timeout for report generation
+    ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel2()
+    report, err := client.Orders.Search(ctx2, searchRequest)
+    ```
+    
+    **Use when:** Different operations have different timeout requirements.
+  </Tab>
+  
+  <Tab title="Global Timeouts">
+    Configure timeout on the HTTP client:
+    
+    ```go
+    client := squareclient.NewClient(
+        option.WithHTTPClient(&http.Client{
+            Timeout: 10 * time.Second,
+        }),
+    )
+    ```
+    
+    **Use when:** All operations should have the same timeout.
+  </Tab>
+</Tabs>
+
+<Note>
+Context timeouts override HTTP client timeouts. If both are set, the shorter timeout will trigger first.
+</Note>
+
+## Timeout with Retries
+
+When retries are enabled, the timeout applies to the **entire operation**, including all retry attempts:
+
+```go
+import "time"
+
+// 10-second timeout for entire operation (including retries)
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+response, err := client.Payments.Create(
+    ctx,
+    request,
+    option.WithMaxAttempts(3), // Up to 3 attempts total
+)
+if err != nil {
+    if err == context.DeadlineExceeded {
+        log.Println("Operation timed out after retries")
+    }
+    return err
+}
+```
+
+<Steps>
+  <Step title="First attempt">
+    Request is sent with remaining time from context.
+  </Step>
+  
+  <Step title="Retry delay">
+    If retry is needed, SDK waits for exponential backoff delay.
+  </Step>
+  
+  <Step title="Context check">
+    Before each retry, the SDK checks if context has expired.
+  </Step>
+  
+  <Step title="Cancellation">
+    If context expires during retry delay, operation is cancelled immediately.
+  </Step>
+</Steps>
+
+## Timeout Best Practices
+
+### Choose Appropriate Timeout Values
+
+```go
+const (
+    QuickTimeout  = 2 * time.Second  // Fast operations: list, get
+    NormalTimeout = 10 * time.Second // Normal operations: create, update
+    LongTimeout   = 30 * time.Second // Complex operations: search, reports
+)
+
+// Fast operation
+ctx1, cancel1 := context.WithTimeout(context.Background(), QuickTimeout)
+defer cancel1()
+locations, _ := client.Locations.List(ctx1, request)
+
+// Complex operation
+ctx2, cancel2 := context.WithTimeout(context.Background(), LongTimeout)
+defer cancel2()
+orders, _ := client.Orders.Search(ctx2, searchRequest)
+```
+
+### Handle Timeout Errors
+
+```go
+import (
+    "context"
+    "errors"
+    "log"
+)
+
+response, err := client.Payments.Create(ctx, request)
+if err != nil {
+    if errors.Is(err, context.DeadlineExceeded) {
+        log.Printf("Request timed out")
+        // Maybe retry with longer timeout
+        return handleTimeout(request)
+    }
+    if errors.Is(err, context.Canceled) {
+        log.Printf("Request was cancelled")
+        return nil
+    }
+    return err
+}
+```
+
+### Use Context Cancellation
+
+Manually cancel operations when needed:
+
+```go
+ctx, cancel := context.WithCancel(context.Background())
+defer cancel()
+
+// Cancel context if user disconnects
+go func() {
+    <-userDisconnected
+    cancel()
+}()
+
+response, err := client.Payments.List(ctx, request)
+if errors.Is(err, context.Canceled) {
+    log.Println("User disconnected, request cancelled")
+}
+```
+
+## Advanced Timeout Patterns
+
+### Timeout with Deadline
+
+Set an absolute deadline instead of a duration:
+
+```go
+import "time"
+
+// Must complete before 5 PM
+deadline := time.Date(2026, 3, 12, 17, 0, 0, 0, time.UTC)
+ctx, cancel := context.WithDeadline(context.Background(), deadline)
+defer cancel()
+
+response, err := client.Orders.Search(ctx, request)
+```
+
+### Cascading Timeouts
+
+Pass context through multiple operations:
+
+```go
+func ProcessOrder(ctx context.Context, orderID string) error {
+    // All operations share the same timeout
+    order, err := client.Orders.Get(ctx, orderID)
+    if err != nil {
+        return err
+    }
+    
+    payment, err := client.Payments.Create(ctx, paymentRequest)
+    if err != nil {
+        return err
+    }
+    
+    return nil
+}
+
+// Set timeout for entire workflow
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+err := ProcessOrder(ctx, "order-123")
+```
+
+### Custom HTTP Client with Advanced Configuration
+
+```go
+import (
+    "net"
+    "net/http"
+    "time"
+)
+
+client := squareclient.NewClient(
+    option.WithHTTPClient(&http.Client{
+        Timeout: 10 * time.Second,
+        Transport: &http.Transport{
+            DialContext: (&net.Dialer{
+                Timeout:   5 * time.Second, // Connection timeout
+                KeepAlive: 30 * time.Second,
+            }).DialContext,
+            TLSHandshakeTimeout:   5 * time.Second,
+            ResponseHeaderTimeout: 5 * time.Second,
+            ExpectContinueTimeout: 1 * time.Second,
+            MaxIdleConns:          100,
+            IdleConnTimeout:       90 * time.Second,
+        },
+    }),
+)
+```
+
+<Note>
+Providing your own `*http.Client` is recommended for production applications to avoid using `http.DefaultClient` which waits indefinitely.
+</Note>
+
+## Common Timeout Scenarios
+
+<AccordionGroup>
+  <Accordion title="API call never returns">
+    **Problem**: Request hangs indefinitely.
+    
+    **Solution**: Always use context with timeout or configure HTTP client timeout.
+    
+    ```go
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+    response, err := client.Payments.List(ctx, request)
+    ```
+  </Accordion>
+  
+  <Accordion title="Timeout too short for retries">
+    **Problem**: Operation times out before retries complete.
+    
+    **Solution**: Set timeout long enough to account for retries and backoff delays.
+    
+    ```go
+    // Allow time for 3 attempts with exponential backoff
+    // Attempt 1: 5s, delay: 1s, Attempt 2: 5s, delay: 2s, Attempt 3: 5s
+    // Total: ~18s
+    ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+    defer cancel()
+    ```
+  </Accordion>
+  
+  <Accordion title="Context leak">
+    **Problem**: Forgetting to call `cancel()` causes goroutine leaks.
+    
+    **Solution**: Always use `defer cancel()` immediately after creating the context.
+    
+    ```go
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel() // Always call this
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Monitoring Timeouts
+
+Track timeout occurrences in your application:
+
+```go
+import (
+    "context"
+    "errors"
+    "time"
+)
+
+func trackTimeout(operation string, start time.Time, err error) {
+    duration := time.Since(start)
+    
+    if errors.Is(err, context.DeadlineExceeded) {
+        log.Printf("TIMEOUT: %s took %v", operation, duration)
+        // Report to monitoring system
+        metrics.RecordTimeout(operation, duration)
+    }
+}
+
+func listPayments(ctx context.Context) error {
+    start := time.Now()
+    response, err := client.Payments.List(ctx, request)
+    trackTimeout("list_payments", start, err)
+    return err
+}
+```

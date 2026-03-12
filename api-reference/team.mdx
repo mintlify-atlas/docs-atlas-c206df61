@@ -1,0 +1,176 @@
+---
+title: "Team"
+description: "Manage jobs in your Square account using the Team API"
+---
+
+The Team API provides methods to manage jobs that can be assigned to team members. Jobs define titles and tip eligibility settings for your employees.
+
+## Overview
+
+The `client.Team` client provides access to job management operations:
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Use the Team client
+response, err := client.Team.ListJobs(context.Background(), &square.ListJobsRequest{})
+```
+
+## Methods
+
+### ListJobs
+
+Lists jobs in a seller account. Results are sorted by title in ascending order.
+
+```go
+request := &square.ListJobsRequest{
+    Cursor: square.String("cursor"),
+}
+
+response, err := client.Team.ListJobs(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, job := range response.Jobs {
+    fmt.Printf("Job: %s (ID: %s)\n", *job.Title, *job.ID)
+}
+```
+
+<ParamField path="cursor" type="*string">
+  The pagination cursor returned by the previous call to this endpoint. Provide this cursor to retrieve the next page of results. For more information, see [Pagination](https://developer.squareup.com/docs/build-basics/common-api-patterns/pagination).
+</ParamField>
+
+<ResponseField name="jobs" type="[]*square.Job">
+  The retrieved jobs. A single paged response contains up to 100 jobs.
+</ResponseField>
+
+<ResponseField name="cursor" type="*string">
+  An opaque cursor used to retrieve the next page of results.
+</ResponseField>
+
+### CreateJob
+
+Creates a job in a seller account. A job defines a title and tip eligibility. Note that compensation is defined in a job assignment in a team member's wage setting.
+
+```go
+request := &square.CreateJobRequest{
+    Job: &square.Job{
+        Title: square.String("Cashier"),
+        IsTipEligible: square.Bool(true),
+    },
+    IdempotencyKey: "idempotency-key-0",
+}
+
+response, err := client.Team.CreateJob(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created job: %s\n", *response.Job.ID)
+```
+
+<ParamField path="job" type="*square.Job" required>
+  The job to create. The `title` field is required and `is_tip_eligible` defaults to true.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string" required>
+  A unique identifier for the `CreateJob` request. Keys can be any valid string, but must be unique for each request. For more information, see [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency).
+</ParamField>
+
+<ResponseField name="job" type="*square.Job">
+  The new job.
+</ResponseField>
+
+### RetrieveJob
+
+Retrieves a specified job by ID.
+
+```go
+request := &square.RetrieveJobRequest{
+    JobID: "job_id",
+}
+
+response, err := client.Team.RetrieveJob(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Job title: %s\n", *response.Job.Title)
+```
+
+<ParamField path="jobID" type="string" required>
+  The ID of the job to retrieve.
+</ParamField>
+
+<ResponseField name="job" type="*square.Job">
+  The retrieved job.
+</ResponseField>
+
+### UpdateJob
+
+Updates the title or tip eligibility of a job. Changes to the title propagate to all `JobAssignment`, `Shift`, and `TeamMemberWage` objects that reference the job ID.
+
+```go
+request := &square.UpdateJobRequest{
+    JobID: "job_id",
+    Job: &square.Job{
+        Title: square.String("Cashier 1"),
+        IsTipEligible: square.Bool(true),
+    },
+}
+
+response, err := client.Team.UpdateJob(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Updated job: %s\n", *response.Job.Title)
+```
+
+<ParamField path="jobID" type="string" required>
+  The ID of the job to update.
+</ParamField>
+
+<ParamField path="job" type="*square.Job" required>
+  The job with the updated fields, either `title`, `is_tip_eligible`, or both. Only changed fields need to be included in the request. Optionally include `version` to enable optimistic concurrency control.
+</ParamField>
+
+<ResponseField name="job" type="*square.Job">
+  The updated job.
+</ResponseField>
+
+## Job Object
+
+The `Job` object represents a job that can be assigned to team members.
+
+<ResponseField name="id" type="*string">
+  **Read only** The unique Square-assigned ID of the job.
+</ResponseField>
+
+<ResponseField name="title" type="*string">
+  The title of the job.
+</ResponseField>
+
+<ResponseField name="isTipEligible" type="*bool">
+  Indicates whether team members can earn tips for the job.
+</ResponseField>
+
+<ResponseField name="createdAt" type="*string">
+  The timestamp when the job was created, in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="updatedAt" type="*string">
+  The timestamp when the job was last updated, in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="version" type="*int">
+  **Read only** The current version of the job. Include this field in `UpdateJob` requests to enable optimistic concurrency control.
+</ResponseField>

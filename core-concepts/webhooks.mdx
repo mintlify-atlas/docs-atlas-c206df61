@@ -1,0 +1,444 @@
+---
+title: Webhook Signature Verification
+description: Learn how to verify webhook signatures to ensure events originate from Square
+---
+
+Square sends webhook notifications to inform your application about events like payment updates, order changes, and customer updates. The Square Go SDK provides utilities to verify that webhook events genuinely originate from Square.
+
+## Why Verify Webhooks?
+
+Webhook signature verification is critical for security:
+
+- **Authenticity**: Ensures the webhook came from Square, not a malicious actor
+- **Integrity**: Confirms the payload hasn't been tampered with
+- **Security**: Prevents attackers from triggering unauthorized actions in your system
+
+<Warning>
+Always verify webhook signatures in production. Without verification, attackers could send fake webhook events to your application.
+</Warning>
+
+## How Webhook Signatures Work
+
+Square signs each webhook notification using HMAC-SHA256:
+
+1. Square concatenates the notification URL and request body
+2. Computes an HMAC-SHA256 hash using your signature key
+3. Sends the hash in the `x-square-hmacsha256-signature` header
+4. Your application recomputes the hash and compares it
+
+## Verifying Webhook Signatures
+
+Use the `client.Webhooks.VerifySignature` method to verify webhooks:
+
+```go
+import (
+    "context"
+    "io"
+    "net/http"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func HandleWebhook(w http.ResponseWriter, r *http.Request) {
+    // Read the request body
+    body, err := io.ReadAll(r.Body)
+    if err != nil {
+        http.Error(w, "Failed to read request body", http.StatusBadRequest)
+        return
+    }
+    
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+    )
+    
+    err = client.Webhooks.VerifySignature(
+        context.TODO(),
+        &square.VerifySignatureRequest{
+            RequestBody:     string(body),
+            SignatureHeader: r.Header.Get("x-square-hmacsha256-signature"),
+            SignatureKey:    "YOUR_SIGNATURE_KEY",
+            NotificationURL: "https://example.com/webhook",
+        },
+    )
+    
+    if err != nil {
+        http.Error(w, "Invalid signature", http.StatusUnauthorized)
+        return
+    }
+    
+    // Signature is valid - process the webhook
+    processWebhook(body)
+    w.WriteHeader(http.StatusOK)
+}
+```
+
+## Getting Your Signature Key
+
+<Steps>
+  <Step title="Navigate to Square Dashboard">
+    Go to the [Square Developer Dashboard](https://developer.squareup.com/apps)
+  </Step>
+  
+  <Step title="Select your application">
+    Choose the application that will receive webhooks
+  </Step>
+  
+  <Step title="Go to Webhooks section">
+    Navigate to the Webhooks section in the left sidebar
+  </Step>
+  
+  <Step title="Copy the signature key">
+    Your webhook signature key is displayed at the top of the page
+  </Step>
+</Steps>
+
+<Note>
+The signature key is different from your access token. Keep both secure and never commit them to version control.
+</Note>
+
+## Complete Webhook Handler Example
+
+```go
+package main
+
+import (
+    "context"
+    "encoding/json"
+    "io"
+    "log"
+    "net/http"
+    "os"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+var client *squareclient.Client
+
+func init() {
+    client = squareclient.NewClient(
+        option.WithToken(os.Getenv("SQUARE_ACCESS_TOKEN")),
+    )
+}
+
+func webhookHandler(w http.ResponseWriter, r *http.Request) {
+    // Only accept POST requests
+    if r.Method != http.MethodPost {
+        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+        return
+    }
+    
+    // Read request body
+    body, err := io.ReadAll(r.Body)
+    if err != nil {
+        log.Printf("Error reading body: %v", err)
+        http.Error(w, "Bad request", http.StatusBadRequest)
+        return
+    }
+    defer r.Body.Close()
+    
+    // Verify signature
+    signatureKey := os.Getenv("SQUARE_WEBHOOK_SIGNATURE_KEY")
+    notificationURL := os.Getenv("WEBHOOK_URL") // Your webhook URL
+    
+    err = client.Webhooks.VerifySignature(
+        context.Background(),
+        &square.VerifySignatureRequest{
+            RequestBody:     string(body),
+            SignatureHeader: r.Header.Get("x-square-hmacsha256-signature"),
+            SignatureKey:    signatureKey,
+            NotificationURL: notificationURL,
+        },
+    )
+    
+    if err != nil {
+        log.Printf("Invalid webhook signature: %v", err)
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+    
+    // Parse webhook event
+    var event square.WebhookEvent
+    if err := json.Unmarshal(body, &event); err != nil {
+        log.Printf("Error parsing webhook: %v", err)
+        http.Error(w, "Bad request", http.StatusBadRequest)
+        return
+    }
+    
+    // Process the event
+    if err := handleWebhookEvent(&event); err != nil {
+        log.Printf("Error processing webhook: %v", err)
+        http.Error(w, "Internal server error", http.StatusInternalServerError)
+        return
+    }
+    
+    // Return success
+    w.WriteHeader(http.StatusOK)
+}
+
+func handleWebhookEvent(event *square.WebhookEvent) error {
+    log.Printf("Received webhook event type: %s", event.Type)
+    
+    switch event.Type {
+    case "payment.updated":
+        return handlePaymentUpdate(event)
+    case "order.created":
+        return handleOrderCreated(event)
+    case "customer.created":
+        return handleCustomerCreated(event)
+    default:
+        log.Printf("Unknown event type: %s", event.Type)
+    }
+    
+    return nil
+}
+
+func main() {
+    http.HandleFunc("/webhook", webhookHandler)
+    
+    log.Println("Starting webhook server on :8080")
+    if err := http.ListenAndServe(":8080", nil); err != nil {
+        log.Fatal(err)
+    }
+}
+```
+
+## Signature Verification Implementation
+
+The SDK's signature verification uses timing-safe comparison:
+
+```go
+// From webhooks/client/verify_signature.go
+package client
+
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/base64"
+    "errors"
+)
+
+func (c *Client) VerifySignature(_ context.Context, request *v2.VerifySignatureRequest) error {
+    if request.RequestBody == "" {
+        return nil
+    }
+    
+    if err := validateVerifySignatureRequest(request); err != nil {
+        return err
+    }
+    
+    expectedSignature, err := createHmac(
+        request.NotificationURL+request.RequestBody,
+        request.SignatureKey,
+    )
+    if err != nil {
+        return err
+    }
+    
+    if !timingSafeEqual(expectedSignature, request.SignatureHeader) {
+        return errors.New("signature hash does not match the expected signature hash for payload")
+    }
+    
+    return nil
+}
+
+func createHmac(data, key string) (string, error) {
+    h := hmac.New(func() hash.Hash { return sha256.New() }, []byte(key))
+    if _, err := h.Write([]byte(data)); err != nil {
+        return "", err
+    }
+    return base64.StdEncoding.EncodeToString(h.Sum(nil)), nil
+}
+
+func timingSafeEqual(a, b string) bool {
+    return hmac.Equal([]byte(a), []byte(b))
+}
+```
+
+## Validation Errors
+
+The SDK validates all required fields:
+
+```go
+func validateVerifySignatureRequest(request *v2.VerifySignatureRequest) error {
+    if request.SignatureHeader == "" {
+        return errors.New("signature header is required")
+    }
+    if request.SignatureKey == "" {
+        return errors.New("signature key is required")
+    }
+    if request.NotificationURL == "" {
+        return errors.New("notification URL is required")
+    }
+    return nil
+}
+```
+
+<AccordionGroup>
+  <Accordion title="Missing signature header">
+    **Error**: "signature header is required"
+    
+    Ensure the `x-square-hmacsha256-signature` header is present in the request.
+  </Accordion>
+  
+  <Accordion title="Invalid signature key">
+    **Error**: "signature key is required"
+    
+    Provide your webhook signature key from the Square Dashboard.
+  </Accordion>
+  
+  <Accordion title="Missing notification URL">
+    **Error**: "notification URL is required"
+    
+    Provide the exact URL where Square sends webhooks (must match dashboard configuration).
+  </Accordion>
+  
+  <Accordion title="Signature mismatch">
+    **Error**: "signature hash does not match the expected signature hash for payload"
+    
+    Common causes:
+    - Incorrect signature key
+    - Wrong notification URL
+    - Modified request body
+    - Request body encoding issues
+  </Accordion>
+</AccordionGroup>
+
+## Important Considerations
+
+### Notification URL Must Match Exactly
+
+The notification URL used for verification must **exactly match** the URL configured in your Square Dashboard:
+
+```go
+// If your dashboard URL is https://example.com/webhook
+err := client.Webhooks.VerifySignature(
+    ctx,
+    &square.VerifySignatureRequest{
+        NotificationURL: "https://example.com/webhook", // Must match exactly
+        // ... other fields
+    },
+)
+```
+
+<Warning>
+Even minor differences like trailing slashes, query parameters, or HTTP vs HTTPS will cause verification to fail.
+</Warning>
+
+### Preserve Request Body
+
+The request body must be used exactly as received:
+
+```go
+// Correct - read body once and use the same bytes
+body, _ := io.ReadAll(r.Body)
+err := client.Webhooks.VerifySignature(ctx, &square.VerifySignatureRequest{
+    RequestBody: string(body),
+    // ...
+})
+
+// Incorrect - parsing changes the body
+var event square.WebhookEvent
+json.NewDecoder(r.Body).Decode(&event) // Body is now consumed
+reconstructedBody, _ := json.Marshal(event) // Won't match original
+```
+
+### Empty Request Body
+
+If the request body is empty, verification returns `nil` (success):
+
+```go
+if request.RequestBody == "" {
+    return nil
+}
+```
+
+## Testing Webhooks
+
+<Tabs>
+  <Tab title="Local Testing">
+    Use a tool like [ngrok](https://ngrok.com/) to expose your local server:
+    
+    ```bash
+    # Start your webhook server
+    go run main.go
+    
+    # In another terminal, expose it
+    ngrok http 8080
+    ```
+    
+    Use the ngrok URL in your Square Dashboard webhook configuration.
+  </Tab>
+  
+  <Tab title="Unit Testing">
+    Test signature verification in unit tests:
+    
+    ```go
+    func TestVerifySignature(t *testing.T) {
+        client := squareclient.NewClient()
+        
+        body := `{"type":"payment.updated"}`
+        key := "test-signature-key"
+        url := "https://example.com/webhook"
+        
+        // Create expected signature
+        h := hmac.New(sha256.New, []byte(key))
+        h.Write([]byte(url + body))
+        signature := base64.StdEncoding.EncodeToString(h.Sum(nil))
+        
+        err := client.Webhooks.VerifySignature(
+            context.Background(),
+            &square.VerifySignatureRequest{
+                RequestBody:     body,
+                SignatureHeader: signature,
+                SignatureKey:    key,
+                NotificationURL: url,
+            },
+        )
+        
+        if err != nil {
+            t.Errorf("Verification failed: %v", err)
+        }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<Steps>
+  <Step title="Always verify signatures">
+    Never process webhook events without verifying the signature first.
+  </Step>
+  
+  <Step title="Keep signature key secure">
+    Store the signature key in environment variables or secret management systems.
+  </Step>
+  
+  <Step title="Return 200 quickly">
+    Verify the signature and return HTTP 200, then process the event asynchronously.
+  </Step>
+  
+  <Step title="Handle replay attacks">
+    Track processed webhook IDs to prevent processing the same event twice.
+  </Step>
+  
+  <Step title="Log verification failures">
+    Log failed signature verifications for security monitoring.
+  </Step>
+</Steps>
+
+## Common Webhook Event Types
+
+- `payment.created` - A new payment was created
+- `payment.updated` - A payment was updated
+- `order.created` - A new order was created
+- `order.updated` - An order was updated
+- `customer.created` - A new customer was created
+- `customer.updated` - Customer information was updated
+- `inventory.count.updated` - Inventory count changed
+
+See the [Square Webhooks documentation](https://developer.squareup.com/docs/webhooks/overview) for a complete list.

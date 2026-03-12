@@ -1,0 +1,259 @@
+---
+title: "API Reference Overview"
+description: "Overview of the Square Go SDK API clients and architecture"
+---
+
+## Introduction
+
+The Square Go SDK provides a comprehensive set of API clients for interacting with Square's various services. The SDK is organized into domain-specific clients, each handling a particular aspect of the Square platform.
+
+## Client Architecture
+
+The SDK uses a modular architecture where the main `Client` type provides access to all resource-specific clients. Each resource client is responsible for operations related to a specific Square API domain.
+
+### Main Client
+
+The root `Client` type serves as the entry point to all Square APIs:
+
+```go
+import (
+    "github.com/square/square-go-sdk/v3/client"
+    "github.com/square/square-go-sdk/v3/option"
+)
+
+// Initialize with access token
+client := client.NewClient(
+    option.WithToken("your-access-token"),
+)
+
+// Access resource clients
+payments := client.Payments
+customers := client.Customers
+```
+
+## Available API Clients
+
+The SDK provides clients for the following Square APIs:
+
+### Payments & Transactions
+
+<CardGroup cols={2}>
+  <Card title="Payments" icon="credit-card">
+    Process payments and manage payment methods
+  </Card>
+  <Card title="Refunds" icon="rotate-left">
+    Handle payment refunds and cancellations
+  </Card>
+  <Card title="Checkout" icon="cart-shopping">
+    Create online checkout experiences
+  </Card>
+  <Card title="Terminal" icon="tablet">
+    Manage in-person terminal transactions
+  </Card>
+</CardGroup>
+
+### Customer Management
+
+<CardGroup cols={2}>
+  <Card title="Customers" icon="users">
+    Manage customer profiles and data
+  </Card>
+  <Card title="Cards" icon="credit-card">
+    Handle customer payment cards
+  </Card>
+  <Card title="Loyalty" icon="star">
+    Administer loyalty programs and rewards
+  </Card>
+  <Card title="Gift Cards" icon="gift">
+    Manage gift card operations
+  </Card>
+</CardGroup>
+
+### Business Operations
+
+<CardGroup cols={2}>
+  <Card title="Catalog" icon="book">
+    Manage products, items, and variations
+  </Card>
+  <Card title="Inventory" icon="boxes-stacked">
+    Track and manage inventory levels
+  </Card>
+  <Card title="Orders" icon="receipt">
+    Create and manage orders
+  </Card>
+  <Card title="Invoices" icon="file-invoice">
+    Generate and send invoices
+  </Card>
+</CardGroup>
+
+### Business Resources
+
+<CardGroup cols={2}>
+  <Card title="Locations" icon="location-dot">
+    Manage business locations
+  </Card>
+  <Card title="Merchants" icon="store">
+    Access merchant information
+  </Card>
+  <Card title="Team Members" icon="user-group">
+    Manage staff and permissions
+  </Card>
+  <Card title="Labor" icon="clock">
+    Handle employee scheduling and timekeeping
+  </Card>
+</CardGroup>
+
+### Financial Operations
+
+<CardGroup cols={2}>
+  <Card title="Bank Accounts" icon="building-columns">
+    Manage linked bank accounts
+  </Card>
+  <Card title="Payouts" icon="money-bill-transfer">
+    Track settlement payouts
+  </Card>
+  <Card title="Disputes" icon="gavel">
+    Handle payment disputes and chargebacks
+  </Card>
+  <Card title="Cash Drawers" icon="cash-register">
+    Manage cash drawer operations
+  </Card>
+</CardGroup>
+
+### Additional Services
+
+<CardGroup cols={2}>
+  <Card title="Bookings" icon="calendar-check">
+    Manage appointments and bookings
+  </Card>
+  <Card title="Subscriptions" icon="repeat">
+    Handle recurring subscription billing
+  </Card>
+  <Card title="Sites" icon="globe">
+    Manage Square Online sites
+  </Card>
+  <Card title="Webhooks" icon="webhook">
+    Configure webhook subscriptions
+  </Card>
+</CardGroup>
+
+### Integration & Tools
+
+<CardGroup cols={2}>
+  <Card title="OAuth" icon="key">
+    Handle OAuth authentication flows
+  </Card>
+  <Card title="Events" icon="bell">
+    Subscribe to Square events
+  </Card>
+  <Card title="Devices" icon="mobile">
+    Manage device codes and hardware
+  </Card>
+  <Card title="Snippets" icon="code">
+    Embed Square functionality in websites
+  </Card>
+</CardGroup>
+
+## Client Organization
+
+All clients follow a consistent pattern:
+
+1. **Initialization**: Each client is automatically initialized when you create the main `Client`
+2. **Methods**: Clients expose methods corresponding to Square API endpoints
+3. **Context Support**: All methods accept a `context.Context` for cancellation and timeouts
+4. **Options**: Methods accept optional `RequestOption` parameters for customization
+5. **Raw Response**: Each client includes a `WithRawResponse` variant for accessing full HTTP responses
+
+### Example Usage
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3/client"
+    "github.com/square/square-go-sdk/v3/option"
+)
+
+func main() {
+    // Create client
+    client := client.NewClient(
+        option.WithToken("your-access-token"),
+    )
+    
+    // Use a specific API client
+    ctx := context.Background()
+    
+    // List customers
+    customersPage, err := client.Customers.List(
+        ctx,
+        &square.ListCustomersRequest{},
+    )
+    if err != nil {
+        // Handle error
+    }
+    
+    // Create a payment
+    payment, err := client.Payments.Create(
+        ctx,
+        &square.CreatePaymentRequest{
+            SourceID:     square.String("card-token"),
+            IdempotencyKey: square.String("unique-key"),
+            AmountMoney: &square.Money{
+                Amount:   square.Int64(1000),
+                Currency: square.CurrencyUsd.Ptr(),
+            },
+        },
+    )
+}
+```
+
+## Error Handling
+
+All client methods return standard Go errors. The SDK includes error types for common failure scenarios:
+
+```go
+response, err := client.Payments.Create(ctx, request)
+if err != nil {
+    // Handle error - check for specific error types
+    // or examine the error message
+    return err
+}
+```
+
+## Pagination
+
+Many list operations return paginated results using the `core.Page` type:
+
+```go
+page, err := client.Customers.List(ctx, &square.ListCustomersRequest{})
+if err != nil {
+    return err
+}
+
+// Iterate through results
+for _, customer := range page.Results() {
+    // Process customer
+}
+
+// Get next page if available
+if !page.Done() {
+    nextPage, err := page.GetNext(ctx)
+    // Process next page
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Client Configuration" href="/api-reference/client">
+    Learn how to initialize and configure the main client
+  </Card>
+  <Card title="Authentication" href="/authentication">
+    Set up authentication for your application
+  </Card>
+  <Card title="Request Options" href="/configuration/request-options">
+    Customize individual requests
+  </Card>
+  <Card title="Error Handling" href="/guides/error-handling">
+    Handle errors and edge cases
+  </Card>
+</CardGroup>

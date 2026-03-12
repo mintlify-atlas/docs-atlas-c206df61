@@ -1,0 +1,429 @@
+---
+title: "Orders"
+description: "Manage orders for purchases and sales with the Square Go SDK"
+---
+
+The Orders API allows you to create and manage orders that can include information about products for purchase. Use orders to calculate pricing, apply discounts and taxes, and integrate with the Payments API to accept payments.
+
+## Available Methods
+
+The Orders client provides the following methods:
+
+- `Create` - Create a new order
+- `BatchGet` - Retrieve multiple orders by ID
+- `Calculate` - Preview order pricing without creating an order  
+- `Clone` - Duplicate an existing order
+- `Search` - Search for orders with filters
+- `Get` - Retrieve a single order by ID
+- `Update` - Update an existing order
+- `Pay` - Pay for an order using approved payments
+
+## Create Order
+
+Creates a new order that can include information about products for purchase and settings to apply to the purchase.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.CreateOrderRequest{
+        Order: &square.Order{
+            LocationID: "057P5VYJ4A5X1",
+            ReferenceID: square.String("my-order-001"),
+            LineItems: []*square.OrderLineItem{
+                {
+                    Name: square.String("New York Strip Steak"),
+                    Quantity: "1",
+                    BasePriceMoney: &square.Money{
+                        Amount: square.Int64(1599),
+                        Currency: square.CurrencyUsd.Ptr(),
+                    },
+                },
+            },
+        },
+        IdempotencyKey: square.String("8193148c-9586-11e6-99f9-28cfe92138cf"),
+    }
+
+    response, err := client.Orders.Create(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Order created: %s\n", response.Order.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="Order" type="*square.Order" required>
+  The order to create with line items, taxes, and discounts
+</ParamField>
+
+<ParamField path="IdempotencyKey" type="*string">
+  A unique string that identifies this CreateOrder request. See [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency) for more information.
+</ParamField>
+
+### Response
+
+<ResponseField name="Order" type="*square.Order">
+  The newly created order
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Batch Get Orders
+
+Retrieves a set of orders by their IDs. If a given order ID does not exist, the ID is ignored instead of generating an error.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BatchGetOrdersRequest{
+        LocationID: square.String("057P5VYJ4A5X1"),
+        OrderIDs: []string{
+            "CAISEM82RcpmcFBM0TfOyiHV3es",
+            "CAISENgvlJ6jLWAzERDzjyHVybY",
+        },
+    }
+
+    response, err := client.Orders.BatchGet(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Retrieved %d orders\n", len(response.Orders))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="LocationID" type="*string">
+  The ID of the location for these orders. This field is optional: omit it to retrieve orders within the scope of the current authorization's merchant ID.
+</ParamField>
+
+<ParamField path="OrderIDs" type="[]string" required>
+  The IDs of the orders to retrieve. A maximum of 100 orders can be retrieved per request.
+</ParamField>
+
+### Response
+
+<ResponseField name="Orders" type="[]*square.Order">
+  The requested orders. This will omit any requested orders that do not exist.
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Calculate Order
+
+Enables applications to preview order pricing without creating an order. Useful for showing customers a price preview before they commit to a purchase.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.CalculateOrderRequest{
+        Order: &square.Order{
+            LocationID: "D7AVYMEAPJ3A3",
+            LineItems: []*square.OrderLineItem{
+                {
+                    Name: square.String("Item 1"),
+                    Quantity: "1",
+                    BasePriceMoney: &square.Money{
+                        Amount: square.Int64(500),
+                        Currency: square.CurrencyUsd.Ptr(),
+                    },
+                },
+            },
+            Discounts: []*square.OrderLineItemDiscount{
+                {
+                    Name: square.String("50% Off"),
+                    Percentage: square.String("50"),
+                    Scope: square.OrderLineItemDiscountScopeOrder.Ptr(),
+                },
+            },
+        },
+    }
+
+    response, err := client.Orders.Calculate(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Calculated total: %d\n", response.Order.TotalMoney.Amount)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="Order" type="*square.Order" required>
+  The order to be calculated. Expects the entire order, not a sparse update.
+</ParamField>
+
+<ParamField path="ProposedRewards" type="[]*square.OrderReward">
+  Identifies one or more loyalty reward tiers to apply during the order calculation. The discounts defined by the reward tiers are added to the order only to preview the effect of applying the specified rewards.
+</ParamField>
+
+### Response
+
+<ResponseField name="Order" type="*square.Order">
+  The calculated version of the order provided in the request
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Search Orders
+
+Search all orders for one or more locations. Orders include all sales, returns, and exchanges regardless of how or when they entered the Square ecosystem.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.SearchOrdersRequest{
+        LocationIDs: []string{
+            "057P5VYJ4A5X1",
+            "18YC4JDH91E1H",
+        },
+        Query: &square.SearchOrdersQuery{
+            Filter: &square.SearchOrdersFilter{
+                StateFilter: &square.SearchOrdersStateFilter{
+                    States: []square.OrderState{
+                        square.OrderStateCompleted,
+                    },
+                },
+                DateTimeFilter: &square.SearchOrdersDateTimeFilter{
+                    ClosedAt: &square.TimeRange{
+                        StartAt: square.String("2018-03-03T20:00:00+00:00"),
+                        EndAt: square.String("2019-03-04T21:54:45+00:00"),
+                    },
+                },
+            },
+            Sort: &square.SearchOrdersSort{
+                SortField: square.SearchOrdersSortFieldClosedAt,
+                SortOrder: square.SortOrderDesc.Ptr(),
+            },
+        },
+        Limit: square.Int(3),
+        ReturnEntries: square.Bool(true),
+    }
+
+    response, err := client.Orders.Search(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Found %d orders\n", len(response.Orders))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="LocationIDs" type="[]string">
+  The location IDs for the orders to query. All locations must belong to the same merchant. Max: 10 location IDs.
+</ParamField>
+
+<ParamField path="Query" type="*square.SearchOrdersQuery">
+  Query conditions used to filter or sort the results. Note that when retrieving additional pages using a cursor, you must use the original query.
+</ParamField>
+
+<ParamField path="Limit" type="*int">
+  The maximum number of results to be returned in a single page. Default: 500, Max: 1000
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  A pagination cursor returned by a previous call to this endpoint. Provide this cursor to retrieve the next set of results for your original query.
+</ParamField>
+
+<ParamField path="ReturnEntries" type="*bool">
+  A Boolean that controls the format of the search results. If true, SearchOrders returns OrderEntry objects. If false, SearchOrders returns complete order objects. Default: false.
+</ParamField>
+
+### Response
+
+<ResponseField name="Orders" type="[]*square.Order">
+  The list of orders that match the query
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to retrieve the next set of results
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Get Order
+
+Retrieves an order by ID.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.GetOrdersRequest{
+        OrderID: "CAISEM82RcpmcFBM0TfOyiHV3es",
+    }
+
+    response, err := client.Orders.Get(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Order: %s\n", response.Order.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="OrderID" type="string" required>
+  The ID of the order to retrieve
+</ParamField>
+
+### Response
+
+<ResponseField name="Order" type="*square.Order">
+  The requested order
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Pay Order
+
+Pay for an order using one or more approved payments or settle an order with a total of 0.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.PayOrderRequest{
+        OrderID: "CAISENgvlJ6jLWAzERDzjyHVybY",
+        IdempotencyKey: "c043a359-7ad9-4136-82a9-c3f1d66dcbff",
+        PaymentIDs: []string{
+            "EnZdNAlWCmfh6Mt5FMNST1o7taB",
+            "0LRiVlbXVwe8ozu4KbZxd12mvaB",
+        },
+    }
+
+    response, err := client.Orders.Pay(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Order paid: %s\n", response.Order.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="OrderID" type="string" required>
+  The ID of the order being paid
+</ParamField>
+
+<ParamField path="IdempotencyKey" type="string" required>
+  A value you specify that uniquely identifies this request among requests you have sent. See [Idempotency](https://developer.squareup.com/docs/working-with-apis/idempotency) for more information.
+</ParamField>
+
+<ParamField path="OrderVersion" type="*int">
+  The version of the order being paid. If not supplied, the latest version will be paid.
+</ParamField>
+
+<ParamField path="PaymentIDs" type="[]string">
+  The IDs of the payments to collect. The payment total must match the order total.
+</ParamField>
+
+### Response
+
+<ResponseField name="Order" type="*square.Order">
+  The paid, updated order
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>

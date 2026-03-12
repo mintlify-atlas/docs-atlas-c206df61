@@ -1,0 +1,254 @@
+---
+title: "Locations"
+description: "Manage business locations with the Square Go SDK"
+---
+
+The Locations API allows you to manage the physical locations of a Square seller. Each location can have its own configuration, including receipt layouts, item prices, and sales reports.
+
+## Overview
+
+The `Locations` client provides methods to:
+- List all locations
+- Create new locations
+- Retrieve location details
+- Update location information
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+    "github.com/square/square-go-sdk/v3/core"
+)
+
+client := square.NewClient(
+    &core.RequestOptions{
+        Token: "YOUR_ACCESS_TOKEN",
+    },
+)
+```
+
+## Methods
+
+### List Locations
+
+Retrieves all locations for a seller, including inactive locations. Locations are listed alphabetically by name.
+
+```go locations/client/client.go
+response, err := client.Locations.List(context.TODO())
+if err != nil {
+    // Handle error
+}
+
+for _, location := range response.Locations {
+    fmt.Printf("Location: %s (ID: %s)\n", *location.Name, *location.ID)
+}
+```
+
+<ParamField path="context" type="context.Context" required>
+  The context for the request
+</ParamField>
+
+<ResponseField name="locations" type="[]*Location">
+  Array of location objects
+  
+  <Expandable title="Location Object">
+    <ResponseField name="id" type="string">
+      The unique identifier for the location
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      The name of the location
+    </ResponseField>
+    
+    <ResponseField name="address" type="Address">
+      The physical address of the location
+    </ResponseField>
+    
+    <ResponseField name="timezone" type="string">
+      The IANA timezone identifier (e.g., "America/Los_Angeles")
+    </ResponseField>
+    
+    <ResponseField name="status" type="LocationStatus">
+      The current status: ACTIVE or INACTIVE
+    </ResponseField>
+    
+    <ResponseField name="capabilities" type="[]LocationCapability">
+      Square features enabled for this location
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Create Location
+
+Creates a new location for the seller. Locations created via the API are permanent and visible to the seller.
+
+```go locations/client/client.go
+request := &square.CreateLocationRequest{
+    Location: &square.Location{
+        Name: square.String("Midtown"),
+        Address: &square.Address{
+            AddressLine1: square.String("1234 Peachtree St. NE"),
+            Locality:     square.String("Atlanta"),
+            AdministrativeDistrictLevel1: square.String("GA"),
+            PostalCode:   square.String("30309"),
+        },
+        Description: square.String("Midtown Atlanta store"),
+    },
+}
+
+response, err := client.Locations.Create(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Created location: %s\n", *response.Location.ID)
+```
+
+<ParamField path="location" type="Location" required>
+  The location object to create
+  
+  <Expandable title="Required Fields">
+    <ParamField path="name" type="string" required>
+      The name of the location (must be unique)
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="Optional Fields">
+    <ParamField path="address" type="Address">
+      The physical address of the location
+    </ParamField>
+    
+    <ParamField path="description" type="string">
+      A description of the location
+    </ParamField>
+    
+    <ParamField path="phone_number" type="string">
+      The phone number for the location
+    </ParamField>
+    
+    <ParamField path="business_name" type="string">
+      The business name for the location
+    </ParamField>
+    
+    <ParamField path="business_email" type="string">
+      The business email for the location
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Get Location
+
+Retrieves details of a single location. You can specify "main" as the location ID to retrieve the main location.
+
+```go locations/client/client.go
+request := &square.GetLocationsRequest{
+    LocationID: "LOCATION_ID",
+}
+
+response, err := client.Locations.Get(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Location: %s\n", *response.Location.Name)
+```
+
+<ParamField path="locationID" type="string" required>
+  The ID of the location to retrieve. Use "main" to get the main location.
+</ParamField>
+
+### Update Location
+
+Updates an existing location's information.
+
+```go locations/client/client.go
+request := &square.UpdateLocationRequest{
+    LocationID: "LOCATION_ID",
+    Location: &square.Location{
+        Name:        square.String("Updated Name"),
+        Description: square.String("Updated description"),
+    },
+}
+
+response, err := client.Locations.Update(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+```
+
+<ParamField path="locationID" type="string" required>
+  The ID of the location to update
+</ParamField>
+
+<ParamField path="location" type="Location" required>
+  The location object with updated fields
+</ParamField>
+
+## Response Types
+
+### Location
+
+Represents a physical business location.
+
+<ResponseField name="id" type="string">
+  Square-assigned unique identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The location name (appears in the Seller Dashboard)
+</ResponseField>
+
+<ResponseField name="address" type="Address">
+  The physical address
+</ResponseField>
+
+<ResponseField name="timezone" type="string">
+  IANA timezone identifier
+</ResponseField>
+
+<ResponseField name="capabilities" type="[]LocationCapability">
+  Enabled Square features (e.g., CREDIT_CARD_PROCESSING, AUTOMATIC_TRANSFERS)
+</ResponseField>
+
+<ResponseField name="status" type="LocationStatus">
+  ACTIVE or INACTIVE
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  Creation timestamp in RFC 3339 format
+</ResponseField>
+
+<ResponseField name="merchant_id" type="string">
+  The ID of the merchant that owns the location
+</ResponseField>
+
+<ResponseField name="country" type="Country">
+  Two-letter country code (ISO 3166)
+</ResponseField>
+
+<ResponseField name="currency" type="Currency">
+  Currency code (ISO 4217)
+</ResponseField>
+
+## Error Handling
+
+```go
+response, err := client.Locations.Get(context.TODO(), request)
+if err != nil {
+    // Check for API errors
+    if response != nil && len(response.Errors) > 0 {
+        for _, e := range response.Errors {
+            fmt.Printf("Error: %s - %s\n", e.Category, e.Detail)
+        }
+    }
+    return err
+}
+```
+
+## Related Resources
+
+- [Locations API Documentation](https://developer.squareup.com/docs/locations-api)
+- [Merchants API](/api-reference/merchants) - Manage merchant information
+- [Main Location Documentation](https://developer.squareup.com/docs/locations-api#about-the-main-location)

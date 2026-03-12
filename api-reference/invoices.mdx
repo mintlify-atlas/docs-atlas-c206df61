@@ -1,0 +1,573 @@
+---
+title: "Invoices"
+description: "Create and manage invoices for payments with the Square Go SDK"
+---
+
+The Invoices API enables you to create, configure, and publish invoices for orders. Invoices can be sent via email or SMS, and customers can pay online using Square-hosted payment pages.
+
+## Available Methods
+
+The Invoices client provides the following methods:
+
+- `CreateInvoice` - Create a new invoice
+- `SearchInvoices` - Search for invoices with filters
+- `ListInvoices` - List invoices for a location
+- `GetInvoice` - Retrieve a specific invoice
+- `UpdateInvoice` - Update an existing invoice
+- `DeleteInvoice` - Delete a draft invoice
+- `PublishInvoice` - Publish an invoice for payment
+- `CancelInvoice` - Cancel a published invoice
+- `CreateInvoiceAttachment` - Add an attachment to an invoice
+- `DeleteInvoiceAttachment` - Remove an attachment from an invoice
+
+## Create Invoice
+
+Creates a draft invoice for an order. You must publish the invoice to send it to customers for payment.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.CreateInvoiceRequest{
+        Invoice: &square.Invoice{
+            LocationID: square.String("ES0RJRZYEC39A"),
+            OrderID: square.String("CAISENgvlJ6jLWAzERDzjyHVybY"),
+            PrimaryRecipient: &square.InvoiceRecipient{
+                CustomerID: square.String("JDKYHBWT1D4F8MFH63DBMEN8Y4"),
+            },
+            PaymentRequests: []*square.InvoicePaymentRequest{
+                {
+                    RequestType: square.InvoiceRequestTypeBalance.Ptr(),
+                    DueDate: square.String("2030-01-24"),
+                },
+            },
+            DeliveryMethod: square.InvoiceDeliveryMethodEmail.Ptr(),
+            InvoiceNumber: square.String("inv-100"),
+            Title: square.String("Event Planning Services"),
+            Description: square.String("We appreciate your business!"),
+            ScheduledAt: square.String("2030-01-13T10:00:00Z"),
+            AcceptedPaymentMethods: &square.InvoiceAcceptedPaymentMethods{
+                Card: square.Bool(true),
+                SquareGiftCard: square.Bool(false),
+                BankAccount: square.Bool(false),
+                BuyNowPayLater: square.Bool(false),
+                CashAppPay: square.Bool(false),
+            },
+        },
+        IdempotencyKey: square.String("ce3748f9-5fc1-4762-aa12-aae5e843f1f4"),
+    }
+
+    response, err := client.Invoices.CreateInvoice(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Invoice created: %s\n", *response.Invoice.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="Invoice" type="*square.Invoice" required>
+  The invoice to create
+</ParamField>
+
+<ParamField path="IdempotencyKey" type="*string">
+  A unique string that identifies the CreateInvoice request. See [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency) for more information.
+</ParamField>
+
+### Response
+
+<ResponseField name="Invoice" type="*square.Invoice">
+  The newly created invoice
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## List Invoices
+
+Returns a list of invoices for a given location. The response is paginated.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.ListInvoicesRequest{
+        LocationID: "ES0RJRZYEC39A",
+        Limit: square.Int(100),
+    }
+
+    response, err := client.Invoices.ListInvoices(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Retrieved %d invoices\n", len(response.Invoices))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="LocationID" type="string" required>
+  The ID of the location for which to list invoices
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  A pagination cursor returned by a previous call to this endpoint. Provide this to retrieve the next set of results.
+</ParamField>
+
+<ParamField path="Limit" type="*int">
+  The maximum number of invoices to return. Default: 100, Maximum: 200
+</ParamField>
+
+### Response
+
+<ResponseField name="Invoices" type="[]*square.Invoice">
+  The list of invoices
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to retrieve the next set of results
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## Search Invoices
+
+Searches for invoices from a location specified in the request. The response is paginated.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.SearchInvoicesRequest{
+        Query: &square.InvoiceQuery{
+            Filter: &square.InvoiceFilter{
+                LocationIDs: []string{"ES0RJRZYEC39A"},
+                CustomerIDs: []string{"JDKYHBWT1D4F8MFH63DBMEN8Y4"},
+            },
+            Sort: &square.InvoiceSort{
+                Field: square.InvoiceSortFieldInvoiceSort,
+                Order: square.SortOrderDesc.Ptr(),
+            },
+        },
+        Limit: square.Int(10),
+    }
+
+    response, err := client.Invoices.SearchInvoices(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Found %d invoices\n", len(response.Invoices))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="Query" type="*square.InvoiceQuery" required>
+  Describes the query criteria for searching invoices
+</ParamField>
+
+<ParamField path="Limit" type="*int">
+  The maximum number of invoices to return. Default: 100, Maximum: 200
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  A pagination cursor returned by a previous call to this endpoint
+</ParamField>
+
+### Response
+
+<ResponseField name="Invoices" type="[]*square.Invoice">
+  The list of invoices that match the query
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to retrieve the next set of results
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## Get Invoice
+
+Retrieves an invoice by invoice ID.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.GetInvoicesRequest{
+        InvoiceID: "inv_1_2bc1",
+    }
+
+    response, err := client.Invoices.GetInvoice(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Invoice: %s\n", *response.Invoice.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="InvoiceID" type="string" required>
+  The ID of the invoice to retrieve
+</ParamField>
+
+### Response
+
+<ResponseField name="Invoice" type="*square.Invoice">
+  The invoice requested
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## Publish Invoice
+
+Publishes the specified draft invoice. After an invoice is published, Square processes the invoice based on the delivery method and payment request settings.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.PublishInvoiceRequest{
+        InvoiceID: "inv_1_2bc1",
+        Version: 1,
+        IdempotencyKey: square.String("32da42d0-1997-41b0-826b-f09464fc2c2e"),
+    }
+
+    response, err := client.Invoices.PublishInvoice(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Invoice published: %s\n", *response.Invoice.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="InvoiceID" type="string" required>
+  The ID of the invoice to publish
+</ParamField>
+
+<ParamField path="Version" type="int" required>
+  The version of the invoice to publish. This must match the current version of the invoice.
+</ParamField>
+
+<ParamField path="IdempotencyKey" type="*string">
+  A unique string that identifies the PublishInvoice request. See [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency) for more information.
+</ParamField>
+
+### Response
+
+<ResponseField name="Invoice" type="*square.Invoice">
+  The published invoice
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## Cancel Invoice
+
+Cancels an invoice. The seller cannot collect payments for the canceled invoice.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.CancelInvoiceRequest{
+        InvoiceID: "inv_1_2bc1",
+        Version: 1,
+    }
+
+    response, err := client.Invoices.CancelInvoice(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Invoice canceled: %s\n", *response.Invoice.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="InvoiceID" type="string" required>
+  The ID of the invoice to cancel
+</ParamField>
+
+<ParamField path="Version" type="int" required>
+  The version of the invoice to cancel. If you do not know the version, you can call GetInvoice or ListInvoices.
+</ParamField>
+
+### Response
+
+<ResponseField name="Invoice" type="*square.Invoice">
+  The canceled invoice
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## Delete Invoice
+
+Deletes the specified invoice. Only invoices in the DRAFT, SCHEDULED, or UNPAID state can be deleted.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.DeleteInvoicesRequest{
+        InvoiceID: "inv_1_2bc1",
+        Version: square.Int(1),
+    }
+
+    response, err := client.Invoices.DeleteInvoice(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Println("Invoice deleted successfully")
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="InvoiceID" type="string" required>
+  The ID of the invoice to delete
+</ParamField>
+
+<ParamField path="Version" type="*int">
+  The version of the invoice to delete. If you do not know the version, you can call GetInvoice or ListInvoices.
+</ParamField>
+
+### Response
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## Create Invoice Attachment
+
+Uploads a file and attaches it to an invoice. This endpoint accepts HTTP multipart/form-data file uploads.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    file, err := os.Open("receipt.pdf")
+    if err != nil {
+        fmt.Printf("Error opening file: %v\n", err)
+        return
+    }
+    defer file.Close()
+
+    request := &square.CreateInvoiceAttachmentRequest{
+        InvoiceID: "inv_1_2bc1",
+        ImageFile: file,
+        Request: &square.CreateInvoiceAttachmentRequestData{
+            IdempotencyKey: square.String("ae5e843f1f4-ce3748f9-5fc1-4762"),
+            Description: square.String("Service receipt"),
+        },
+    }
+
+    response, err := client.Invoices.CreateInvoiceAttachment(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Attachment created: %s\n", *response.Attachment.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="InvoiceID" type="string" required>
+  The ID of the invoice to attach the file to
+</ParamField>
+
+<ParamField path="ImageFile" type="io.Reader" required>
+  The file to upload as an attachment
+</ParamField>
+
+<ParamField path="Request" type="*square.CreateInvoiceAttachmentRequestData">
+  Additional metadata for the attachment
+</ParamField>
+
+### Response
+
+<ResponseField name="Attachment" type="*square.InvoiceAttachment">
+  Metadata about the attachment that was added to the invoice
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>
+
+## Delete Invoice Attachment
+
+Removes an attachment from an invoice and permanently deletes the file.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.DeleteInvoiceAttachmentRequest{
+        InvoiceID: "inv_1_2bc1",
+        AttachmentID: "at_1_abc123",
+    }
+
+    response, err := client.Invoices.DeleteInvoiceAttachment(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Println("Attachment deleted successfully")
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="InvoiceID" type="string" required>
+  The ID of the invoice to delete the attachment from
+</ParamField>
+
+<ParamField path="AttachmentID" type="string" required>
+  The ID of the attachment to delete
+</ParamField>
+
+### Response
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Information about errors encountered during the request
+</ResponseField>

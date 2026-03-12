@@ -1,0 +1,436 @@
+---
+title: "Customers"
+description: "Manage customer profiles and data with the Square Go SDK Customers API client."
+---
+
+The Customers API allows you to create, retrieve, update, search, and delete customer profiles. It supports both individual operations and bulk operations for efficient customer management.
+
+## Client Initialization
+
+Access the Customers client through the main Square client:
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Access the Customers API
+customersClient := client.Customers
+```
+
+## Core Methods
+
+### List
+
+Retrieve a paginated list of customer profiles.
+
+<CodeGroup>
+```go List Customers
+request := &square.ListCustomersRequest{
+    Cursor: square.String("cursor"),
+    Limit: square.Int(100),
+    SortField: square.CustomerSortFieldDefault.Ptr(),
+    SortOrder: square.SortOrderAsc.Ptr(),
+    Count: square.Bool(true),
+}
+
+response, err := client.Customers.List(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, customer := range response.Customers {
+    fmt.Printf("Customer: %s %s\n", 
+        *customer.GivenName, 
+        *customer.FamilyName)
+}
+```
+</CodeGroup>
+
+<ParamField path="cursor" type="*string">
+  A pagination cursor returned by a previous call. Provide this to retrieve the next set of results.
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  Maximum number of results per page (1-100). Default is 100.
+</ParamField>
+
+<ParamField path="sortField" type="*square.CustomerSortField">
+  Field to sort by. Default is `DEFAULT`.
+</ParamField>
+
+<ParamField path="sortOrder" type="*square.SortOrder">
+  Sort order: `ASC` or `DESC`. Default is `ASC`.
+</ParamField>
+
+<ParamField path="count" type="*bool">
+  Whether to return the total count of customers. Default is `false`.
+</ParamField>
+
+<ResponseField name="customers" type="[]*square.Customer">
+  Array of customer profile objects.
+</ResponseField>
+
+<ResponseField name="cursor" type="*string">
+  Pagination cursor for the next page of results.
+</ResponseField>
+
+<ResponseField name="count" type="*int64">
+  Total count of customers (if requested).
+</ResponseField>
+
+### Create
+
+Create a new customer profile.
+
+<CodeGroup>
+```go Create Customer
+request := &square.CreateCustomerRequest{
+    IdempotencyKey: square.String("unique-key-123"),
+    GivenName: square.String("Amelia"),
+    FamilyName: square.String("Earhart"),
+    EmailAddress: square.String("amelia.earhart@example.com"),
+    Address: &square.Address{
+        AddressLine1: square.String("500 Electric Ave"),
+        AddressLine2: square.String("Suite 600"),
+        Locality: square.String("New York"),
+        AdministrativeDistrictLevel1: square.String("NY"),
+        PostalCode: square.String("10003"),
+        Country: square.CountryUs.Ptr(),
+    },
+    PhoneNumber: square.String("+1-212-555-4240"),
+    ReferenceID: square.String("YOUR_REFERENCE_ID"),
+    Note: square.String("Premium customer"),
+}
+
+response, err := client.Customers.Create(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Created customer ID: %s\n", *response.Customer.ID)
+```
+</CodeGroup>
+
+<ParamField path="idempotencyKey" type="*string">
+  Unique key for idempotent operations. See [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency).
+</ParamField>
+
+<ParamField path="givenName" type="*string">
+  First name (max 300 characters).
+</ParamField>
+
+<ParamField path="familyName" type="*string">
+  Last name (max 300 characters).
+</ParamField>
+
+<ParamField path="companyName" type="*string">
+  Business name (max 500 characters).
+</ParamField>
+
+<ParamField path="emailAddress" type="*string">
+  Email address (max 254 characters).
+</ParamField>
+
+<ParamField path="phoneNumber" type="*string">
+  Phone number (9-16 digits with optional + prefix).
+</ParamField>
+
+<ParamField path="address" type="*square.Address">
+  Physical address associated with the customer.
+</ParamField>
+
+<ParamField path="referenceID" type="*string">
+  External reference ID (max 100 characters).
+</ParamField>
+
+<ParamField path="note" type="*string">
+  Custom note about the customer.
+</ParamField>
+
+<ParamField path="birthday" type="*string">
+  Birthday in `YYYY-MM-DD` or `MM-DD` format.
+</ParamField>
+
+<ResponseField name="customer" type="*square.Customer">
+  The newly created customer profile.
+</ResponseField>
+
+### Get
+
+Retrieve a single customer by ID.
+
+<CodeGroup>
+```go Get Customer
+request := &square.GetCustomersRequest{
+    CustomerID: "CUSTOMER_ID_HERE",
+}
+
+response, err := client.Customers.Get(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Customer: %s\n", *response.Customer.EmailAddress)
+```
+</CodeGroup>
+
+<ParamField path="customerID" type="string" required>
+  The Square-assigned customer ID.
+</ParamField>
+
+<ResponseField name="customer" type="*square.Customer">
+  The requested customer profile.
+</ResponseField>
+
+### Update
+
+Update an existing customer profile.
+
+<CodeGroup>
+```go Update Customer
+request := &square.UpdateCustomerRequest{
+    CustomerID: "CUSTOMER_ID_HERE",
+    EmailAddress: square.String("newemail@example.com"),
+    PhoneNumber: square.String("+1-415-555-0000"),
+    Note: square.String("Updated note"),
+    Version: square.Int64(1), // For optimistic concurrency
+}
+
+response, err := client.Customers.Update(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+```
+</CodeGroup>
+
+<ParamField path="customerID" type="string" required>
+  The ID of the customer to update.
+</ParamField>
+
+<ParamField path="version" type="*int64">
+  Current version for optimistic concurrency control.
+</ParamField>
+
+### Delete
+
+Delete a customer profile permanently.
+
+<CodeGroup>
+```go Delete Customer
+request := &square.DeleteCustomersRequest{
+    CustomerID: "CUSTOMER_ID_HERE",
+    Version: square.Int64(1),
+}
+
+response, err := client.Customers.Delete(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+```
+</CodeGroup>
+
+<ParamField path="customerID" type="string" required>
+  The ID of the customer to delete.
+</ParamField>
+
+<ParamField path="version" type="*int64">
+  Current version for optimistic concurrency control.
+</ParamField>
+
+### Search
+
+Search for customers using filters and queries.
+
+<CodeGroup>
+```go Search Customers
+request := &square.SearchCustomersRequest{
+    Query: &square.CustomerQuery{
+        Filter: &square.CustomerFilter{
+            EmailAddress: &square.CustomerTextFilter{
+                Exact: square.String("amelia@example.com"),
+            },
+        },
+        Sort: &square.CustomerSort{
+            Field: square.CustomerSortFieldCreatedAt.Ptr(),
+            Order: square.SortOrderDesc.Ptr(),
+        },
+    },
+    Limit: square.Int64(10),
+}
+
+response, err := client.Customers.Search(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, customer := range response.Customers {
+    fmt.Printf("Found: %s\n", *customer.EmailAddress)
+}
+```
+</CodeGroup>
+
+<ParamField path="query" type="*square.CustomerQuery">
+  Search query with filters and sorting options.
+</ParamField>
+
+<ParamField path="limit" type="*int64">
+  Maximum number of results (default 100).
+</ParamField>
+
+<ParamField path="cursor" type="*string">
+  Pagination cursor from a previous search.
+</ParamField>
+
+## Bulk Operations
+
+### BatchCreate
+
+Create multiple customers in a single request.
+
+<CodeGroup>
+```go Bulk Create Customers
+request := &square.BulkCreateCustomersRequest{
+    Customers: map[string]*square.BulkCreateCustomerData{
+        "idempotency-key-1": {
+            GivenName: square.String("Amelia"),
+            FamilyName: square.String("Earhart"),
+            EmailAddress: square.String("amelia@example.com"),
+        },
+        "idempotency-key-2": {
+            GivenName: square.String("Marie"),
+            FamilyName: square.String("Curie"),
+            EmailAddress: square.String("marie@example.com"),
+        },
+    },
+}
+
+response, err := client.Customers.BatchCreate(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for key, result := range response.Responses {
+    if result.Customer != nil {
+        fmt.Printf("%s: Created %s\n", key, *result.Customer.ID)
+    }
+}
+```
+</CodeGroup>
+
+### BatchRetrieve
+
+Retrieve multiple customers by their IDs.
+
+<CodeGroup>
+```go Bulk Retrieve Customers
+request := &square.BulkRetrieveCustomersRequest{
+    CustomerIDs: []string{
+        "CUSTOMER_ID_1",
+        "CUSTOMER_ID_2",
+    },
+}
+
+response, err := client.Customers.BatchRetrieve(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+```
+</CodeGroup>
+
+### BatchUpdate
+
+Update multiple customers in a single request.
+
+<CodeGroup>
+```go Bulk Update Customers
+request := &square.BulkUpdateCustomersRequest{
+    Customers: map[string]*square.BulkUpdateCustomerData{
+        "CUSTOMER_ID_1": {
+            EmailAddress: square.String("new1@example.com"),
+            Version: square.Int64(1),
+        },
+        "CUSTOMER_ID_2": {
+            PhoneNumber: square.String("+1-555-0000"),
+            Version: square.Int64(1),
+        },
+    },
+}
+
+response, err := client.Customers.BatchUpdate(context.TODO(), request)
+```
+</CodeGroup>
+
+### BatchDelete
+
+Delete multiple customers in a single request.
+
+<CodeGroup>
+```go Bulk Delete Customers
+request := &square.BulkDeleteCustomersRequest{
+    CustomerIDs: []string{
+        "CUSTOMER_ID_1",
+        "CUSTOMER_ID_2",
+    },
+}
+
+response, err := client.Customers.BatchDelete(context.TODO(), request)
+```
+</CodeGroup>
+
+## Types
+
+### Customer
+
+The main customer profile object.
+
+```go
+type Customer struct {
+    ID           *string
+    CreatedAt    *string
+    UpdatedAt    *string
+    GivenName    *string
+    FamilyName   *string
+    EmailAddress *string
+    PhoneNumber  *string
+    CompanyName  *string
+    Nickname     *string
+    Address      *Address
+    Birthday     *string
+    ReferenceID  *string
+    Note         *string
+    Version      *int64
+    TaxIDs       *CustomerTaxIDs
+}
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use Idempotency Keys">
+    Always provide idempotency keys for create operations to prevent duplicate customers if requests are retried.
+  </Accordion>
+  
+  <Accordion title="Optimistic Concurrency">
+    Include the `version` field when updating or deleting customers to prevent conflicts from concurrent modifications.
+  </Accordion>
+  
+  <Accordion title="Bulk Operations">
+    Use bulk endpoints when working with multiple customers to reduce API calls and improve performance.
+  </Accordion>
+  
+  <Accordion title="Required Fields">
+    Provide at least one of: `given_name`, `family_name`, `company_name`, `email_address`, or `phone_number` when creating customers.
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+- [Loyalty API](/api-reference/loyalty) - Build customer loyalty programs
+- [Gift Cards API](/api-reference/gift-cards) - Manage gift cards for customers
+- [Orders API](/api-reference/orders) - Track customer orders

@@ -1,0 +1,477 @@
+---
+title: "Authentication"
+description: "Learn how to securely authenticate your Square Go SDK requests"
+---
+
+## Overview
+
+The Square Go SDK uses access tokens for authentication. All API requests must include a valid access token that identifies your application and determines which Square account's data you can access.
+
+<Note>
+  Square uses **Bearer token authentication**. The SDK automatically handles adding the `Authorization: Bearer <token>` header to all requests.
+</Note>
+
+## Getting Your Access Token
+
+Before you can authenticate:
+
+1. Create a Square account at [squareup.com](https://squareup.com)
+2. Visit the [Square Developer Dashboard](https://developer.squareup.com/apps)
+3. Create or select an application
+4. Copy your access token from the **Credentials** tab
+
+<Warning>
+  Square provides separate credentials for **Sandbox** (testing) and **Production** environments. Never use production credentials for testing or commit them to version control.
+</Warning>
+
+## Authentication Methods
+
+The Square Go SDK provides three ways to configure authentication:
+
+### Method 1: Direct Token (For Testing Only)
+
+Pass the token directly when creating the client:
+
+```go
+import (
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+client := squareclient.NewClient(
+    option.WithToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+<Warning>
+  This method is convenient for testing but **should never be used in production**. Hard-coded tokens in source code are a security risk.
+</Warning>
+
+### Method 2: Environment Variables (Recommended)
+
+The SDK automatically reads the `SQUARE_TOKEN` environment variable:
+
+```go
+// SDK automatically uses SQUARE_TOKEN environment variable
+client := squareclient.NewClient()
+```
+
+Set the environment variable before running your application:
+
+```bash
+export SQUARE_TOKEN="your_access_token"
+go run main.go
+```
+
+Or explicitly read from an environment variable:
+
+```go
+import (
+    "os"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+client := squareclient.NewClient(
+    option.WithToken(os.Getenv("SQUARE_TOKEN")),
+)
+```
+
+<Check>
+  This is the **recommended approach** for production applications. Environment variables keep secrets out of your codebase and make it easy to use different credentials for different environments.
+</Check>
+
+### Method 3: Per-Request Authentication
+
+You can override the client's default token for individual requests:
+
+```go
+// Client configured with one token
+client := squareclient.NewClient(
+    option.WithToken(os.Getenv("DEFAULT_TOKEN")),
+)
+
+// Override token for a specific request
+response, err := client.Payments.List(
+    ctx,
+    &square.ListPaymentsRequest{
+        Total: square.Int64(100),
+    },
+    option.WithToken(os.Getenv("ALTERNATE_TOKEN")),
+)
+```
+
+This is useful for multi-tenant applications or when your application needs to access multiple Square accounts.
+
+## Environment Configuration
+
+Square provides two environments:
+
+- **Sandbox** - For development and testing
+- **Production** - For live transactions
+
+### Using Sandbox Environment
+
+```go
+import "github.com/square/square-go-sdk"
+
+client := squareclient.NewClient(
+    option.WithBaseURL(square.Environments.Sandbox),
+    option.WithToken(os.Getenv("SQUARE_SANDBOX_TOKEN")),
+)
+```
+
+### Using Production Environment (Default)
+
+```go
+// Production is the default - no need to specify
+client := squareclient.NewClient(
+    option.WithToken(os.Getenv("SQUARE_TOKEN")),
+)
+
+// Or explicitly set production environment
+client := squareclient.NewClient(
+    option.WithBaseURL(square.Environments.Production),
+    option.WithToken(os.Getenv("SQUARE_TOKEN")),
+)
+```
+
+### Custom Base URL
+
+For testing or proxying requests:
+
+```go
+client := squareclient.NewClient(
+    option.WithBaseURL("https://example.com"),
+    option.WithToken(os.Getenv("SQUARE_TOKEN")),
+)
+```
+
+## Advanced Authentication Patterns
+
+### Configuration from Environment
+
+Create a reusable configuration pattern:
+
+```go
+package config
+
+import (
+    "fmt"
+    "os"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+type Config struct {
+    Token       string
+    Environment string
+}
+
+func LoadConfig() (*Config, error) {
+    token := os.Getenv("SQUARE_TOKEN")
+    if token == "" {
+        return nil, fmt.Errorf("SQUARE_TOKEN environment variable is required")
+    }
+    
+    return &Config{
+        Token:       token,
+        Environment: os.Getenv("SQUARE_ENVIRONMENT"), // "sandbox" or "production"
+    }, nil
+}
+
+func (c *Config) NewClient() *squareclient.Client {
+    opts := []option.RequestOption{
+        option.WithToken(c.Token),
+    }
+    
+    if c.Environment == "sandbox" {
+        opts = append(opts, option.WithBaseURL(square.Environments.Sandbox))
+    }
+    
+    return squareclient.NewClient(opts...)
+}
+```
+
+Usage:
+
+```go
+config, err := config.LoadConfig()
+if err != nil {
+    log.Fatal(err)
+}
+
+client := config.NewClient()
+```
+
+### Custom HTTP Client with Authentication
+
+Provide your own HTTP client with custom settings:
+
+```go
+import (
+    "net/http"
+    "time"
+)
+
+httpClient := &http.Client{
+    Timeout: 30 * time.Second,
+    Transport: &http.Transport{
+        MaxIdleConns:        100,
+        MaxIdleConnsPerHost: 10,
+        IdleConnTimeout:     90 * time.Second,
+    },
+}
+
+client := squareclient.NewClient(
+    option.WithToken(os.Getenv("SQUARE_TOKEN")),
+    option.WithHTTPClient(httpClient),
+)
+```
+
+<Note>
+  Providing your own `*http.Client` is recommended for production applications. Otherwise, the SDK uses `http.DefaultClient`, which has no timeout.
+</Note>
+
+### Request-Level Headers
+
+Add custom headers to requests:
+
+```go
+import "net/http"
+
+headers := http.Header{
+    "X-Custom-Header": []string{"value"},
+}
+
+response, err := client.Payments.Create(
+    ctx,
+    request,
+    option.WithHTTPHeader(headers),
+)
+```
+
+## Token Security Best Practices
+
+<Steps>
+  <Step title="Never commit tokens to version control">
+    Add `.env` files and any files containing secrets to your `.gitignore`:
+
+    ```bash .gitignore
+    .env
+    .env.local
+    credentials.json
+    *_token.txt
+    ```
+  </Step>
+
+  <Step title="Use environment-specific tokens">
+    Keep separate tokens for development, staging, and production:
+
+    ```bash
+    # Development
+    export SQUARE_TOKEN="sandbox_token_123"
+    
+    # Production
+    export SQUARE_TOKEN="production_token_456"
+    ```
+  </Step>
+
+  <Step title="Rotate tokens regularly">
+    Generate new access tokens periodically from the Square Developer Dashboard and update your environment variables.
+  </Step>
+
+  <Step title="Use secret management services">
+    For production applications, use dedicated secret management:
+
+    - **AWS Secrets Manager**
+    - **HashiCorp Vault**
+    - **Google Secret Manager**
+    - **Azure Key Vault**
+
+    ```go
+    // Example with AWS Secrets Manager
+    token, err := secretsManager.GetSecretValue("square/access-token")
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    client := squareclient.NewClient(
+        option.WithToken(token),
+    )
+    ```
+  </Step>
+
+  <Step title="Limit token permissions">
+    When creating Square applications, only request the OAuth scopes your application needs. Review permissions regularly.
+  </Step>
+</Steps>
+
+## Error Handling
+
+Handle authentication errors gracefully:
+
+```go
+import (
+    "errors"
+    "net/http"
+    
+    "github.com/square/square-go-sdk/core"
+)
+
+response, err := client.Payments.Create(ctx, request)
+if err != nil {
+    var apiError *core.APIError
+    if errors.As(err, &apiError) {
+        switch apiError.StatusCode {
+        case http.StatusUnauthorized:
+            // Invalid or expired token
+            log.Println("Authentication failed: Invalid access token")
+            // Trigger token refresh or user re-authentication
+        case http.StatusForbidden:
+            // Valid token but insufficient permissions
+            log.Println("Insufficient permissions for this operation")
+        default:
+            log.Printf("API error: %v", apiError)
+        }
+    }
+    return err
+}
+```
+
+## OAuth 2.0 Flow
+
+For applications that access Square accounts on behalf of other sellers, use OAuth 2.0:
+
+```go
+// Redirect users to Square authorization URL
+authorizeURL := fmt.Sprintf(
+    "https://connect.squareup.com/oauth2/authorize?client_id=%s&scope=%s&session=false",
+    clientID,
+    "PAYMENTS_READ PAYMENTS_WRITE",
+)
+
+// After user authorizes, exchange the authorization code for an access token
+response, err := client.OAuth.ObtainToken(
+    context.TODO(),
+    &square.ObtainTokenRequest{
+        ClientID:     square.String(clientID),
+        ClientSecret: square.String(clientSecret),
+        Code:         square.String(authorizationCode),
+        GrantType:    "authorization_code",
+    },
+)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+accessToken := response.AccessToken
+```
+
+<Note>
+  OAuth 2.0 is required for third-party applications that access Square data on behalf of other merchants. Personal applications can use access tokens directly.
+</Note>
+
+## Testing Authentication
+
+Test your authentication configuration:
+
+```go
+func TestAuthentication(client *squareclient.Client) error {
+    ctx := context.Background()
+    
+    // Test by fetching locations
+    response, err := client.Locations.List(ctx, &square.ListLocationsRequest{})
+    if err != nil {
+        return fmt.Errorf("authentication test failed: %w", err)
+    }
+    
+    fmt.Printf("✓ Authentication successful! Found %d locations\n", len(response.Locations))
+    return nil
+}
+```
+
+## Complete Authentication Example
+
+Here's a complete example with all best practices:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "net/http"
+    "os"
+    "time"
+
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    // Load token from environment
+    token := os.Getenv("SQUARE_TOKEN")
+    if token == "" {
+        log.Fatal("SQUARE_TOKEN environment variable is required")
+    }
+
+    // Determine environment
+    environment := os.Getenv("SQUARE_ENVIRONMENT")
+    if environment == "" {
+        environment = "production"
+    }
+
+    // Configure options
+    opts := []option.RequestOption{
+        option.WithToken(token),
+        option.WithHTTPClient(&http.Client{
+            Timeout: 30 * time.Second,
+        }),
+        option.WithMaxAttempts(3),
+    }
+
+    // Set environment
+    if environment == "sandbox" {
+        opts = append(opts, option.WithBaseURL(square.Environments.Sandbox))
+        log.Println("Using Sandbox environment")
+    } else {
+        log.Println("Using Production environment")
+    }
+
+    // Create client
+    client := squareclient.NewClient(opts...)
+
+    // Test authentication
+    ctx := context.Background()
+    locations, err := client.Locations.List(ctx, &square.ListLocationsRequest{})
+    if err != nil {
+        log.Fatalf("Authentication failed: %v", err)
+    }
+
+    fmt.Printf("✓ Authenticated successfully\n")
+    fmt.Printf("✓ Found %d location(s)\n", len(locations.Locations))
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payments API" icon="credit-card" href="/payments">
+    Process payments securely
+  </Card>
+  <Card title="Customers API" icon="users" href="/customers">
+    Manage customer data
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/error-handling">
+    Handle errors and retries
+  </Card>
+  <Card title="Webhooks" icon="webhook" href="/webhooks">
+    Receive real-time event notifications
+  </Card>
+</CardGroup>

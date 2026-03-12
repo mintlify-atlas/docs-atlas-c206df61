@@ -1,0 +1,449 @@
+---
+title: "Inventory"
+description: "Track and manage inventory counts with the Square Go SDK"
+---
+
+The Inventory API provides endpoints for managing inventory counts and tracking inventory changes across locations. Use this API to keep your inventory in sync with physical counts and monitor inventory movements.
+
+## Available Methods
+
+The Inventory client provides the following methods:
+
+- `BatchChangeInventory` - Apply physical counts or adjustments to inventory
+- `BatchGetInventoryCounts` - Retrieve current inventory counts
+- `BatchRetrieveInventoryChanges` - Retrieve historical inventory changes
+- `GetInventoryCount` - Get inventory count for a specific catalog object
+- `GetInventoryChanges` - Get inventory changes for a catalog object
+- `GetInventoryAdjustment` - Retrieve a specific inventory adjustment
+- `GetInventoryPhysicalCount` - Retrieve a specific physical count
+- `GetInventoryTransfer` - Retrieve a specific inventory transfer
+
+## Batch Change Inventory
+
+Applies adjustments and counts to the inventory of one or more catalog objects at one or more locations. This is the primary method for updating inventory.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BatchChangeInventoryRequest{
+        IdempotencyKey: "8fc6a5b0-9fe8-4b46-b46b-2ef95793abbe",
+        Changes: []*square.InventoryChange{
+            {
+                Type: square.InventoryChangeTypePhysicalCount.Ptr(),
+                PhysicalCount: &square.InventoryPhysicalCount{
+                    CatalogObjectID: square.String("W62UWFY35CWMYGVWK6TWJDNI"),
+                    State: square.InventoryStateInStock.Ptr(),
+                    LocationID: square.String("L88917AVBK2S5"),
+                    Quantity: square.String("100"),
+                    OccurredAt: square.String("2023-01-15T10:00:00.000Z"),
+                },
+            },
+        },
+    }
+
+    response, err := client.Inventory.BatchChangeInventory(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Updated %d inventory counts\n", len(response.Counts))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="IdempotencyKey" type="string" required>
+  A client-supplied, universally unique identifier (UUID) for the request. See [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency) for more information.
+</ParamField>
+
+<ParamField path="Changes" type="[]*square.InventoryChange">
+  The set of physical counts and inventory adjustments to be made. Changes are applied based on the client-supplied timestamp and may be sent out of order.
+</ParamField>
+
+<ParamField path="IgnoreUnchangedCounts" type="*bool">
+  Indicates whether the current physical count should be ignored if the quantity is unchanged since the last physical count. Default: true
+</ParamField>
+
+### Response
+
+<ResponseField name="Counts" type="[]*square.InventoryCount">
+  The current counts for all objects referenced in the request
+</ResponseField>
+
+<ResponseField name="Changes" type="[]*square.InventoryChange">
+  Changes created for the request
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Batch Get Inventory Counts
+
+Returns current counts for the provided catalog objects at the requested locations. Results are eventually consistent.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BatchGetInventoryCountsRequest{
+        CatalogObjectIDs: []string{
+            "W62UWFY35CWMYGVWK6TWJDNI",
+        },
+        LocationIDs: []string{
+            "L88917AVBK2S5",
+        },
+        States: []square.InventoryState{
+            square.InventoryStateInStock,
+        },
+        Limit: square.Int(100),
+    }
+
+    response, err := client.Inventory.BatchGetInventoryCounts(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Retrieved %d inventory counts\n", len(response.Counts))
+    for _, count := range response.Counts {
+        fmt.Printf("Catalog ID: %s, Quantity: %s\n", 
+            *count.CatalogObjectID, *count.Quantity)
+    }
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="CatalogObjectIDs" type="[]string">
+  The filter to return results by CatalogObject ID. The filter is applicable only when set. The default is null.
+</ParamField>
+
+<ParamField path="LocationIDs" type="[]string">
+  The filter to return results by Location ID. This filter is applicable only when set. The default is null.
+</ParamField>
+
+<ParamField path="UpdatedAfter" type="*string">
+  The filter to return results with their calculated_at value after the given time as specified in an RFC 3339 timestamp. The default value is the UNIX epoch of 1970-01-01T00:00:00Z.
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  A pagination cursor returned by a previous call to this endpoint. Provide this to retrieve the next set of results for the original query.
+</ParamField>
+
+<ParamField path="States" type="[]square.InventoryState">
+  The filter to return results by InventoryState. The filter is only applicable when set. Ignored are untracked states of NONE, SOLD, and UNLINKED_RETURN.
+</ParamField>
+
+<ParamField path="Limit" type="*int">
+  The number of records to return. Default and maximum: 1000
+</ParamField>
+
+### Response
+
+<ResponseField name="Counts" type="[]*square.InventoryCount">
+  The current calculated inventory counts for the requested objects and locations
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to be used in a subsequent request. If unset, this is the final response.
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Batch Retrieve Inventory Changes
+
+Returns historical physical counts and inventory adjustments based on the provided filter criteria. Results are sorted in ascending order by occurred_at.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BatchRetrieveInventoryChangesRequest{
+        CatalogObjectIDs: []string{
+            "W62UWFY35CWMYGVWK6TWJDNI",
+        },
+        LocationIDs: []string{
+            "L88917AVBK2S5",
+        },
+        Types: []square.InventoryChangeType{
+            square.InventoryChangeTypePhysicalCount,
+            square.InventoryChangeTypeAdjustment,
+        },
+        UpdatedAfter: square.String("2023-01-01T00:00:00.000Z"),
+        Limit: square.Int(100),
+    }
+
+    response, err := client.Inventory.BatchRetrieveInventoryChanges(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Retrieved %d inventory changes\n", len(response.Changes))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="CatalogObjectIDs" type="[]string">
+  The filter to return results by CatalogObject ID. The filter is only applicable when set.
+</ParamField>
+
+<ParamField path="LocationIDs" type="[]string">
+  The filter to return results by Location ID. The filter is only applicable when set.
+</ParamField>
+
+<ParamField path="Types" type="[]square.InventoryChangeType">
+  The filter to return results by InventoryChangeType values other than TRANSFER. The default value is [PHYSICAL_COUNT, ADJUSTMENT].
+</ParamField>
+
+<ParamField path="States" type="[]square.InventoryState">
+  The filter to return ADJUSTMENT query results by InventoryState. This filter is only applied when set.
+</ParamField>
+
+<ParamField path="UpdatedAfter" type="*string">
+  The filter to return results with their calculated_at value after the given time as specified in an RFC 3339 timestamp.
+</ParamField>
+
+<ParamField path="UpdatedBefore" type="*string">
+  The filter to return results with their created_at or calculated_at value strictly before the given time as specified in an RFC 3339 timestamp.
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  A pagination cursor returned by a previous call to this endpoint. Provide this to retrieve the next set of results.
+</ParamField>
+
+<ParamField path="Limit" type="*int">
+  The number of records to return. Default and maximum: 1000
+</ParamField>
+
+### Response
+
+<ResponseField name="Changes" type="[]*square.InventoryChange">
+  The current calculated inventory changes for the requested objects and locations
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to be used in a subsequent request
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Get Inventory Count
+
+Retrieves the current calculated stock count for a catalog object at one or more locations.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.GetInventoryRequest{
+        CatalogObjectID: "W62UWFY35CWMYGVWK6TWJDNI",
+        LocationIDs: square.String("L88917AVBK2S5"),
+    }
+
+    response, err := client.Inventory.GetInventoryCount(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Current inventory: %d\n", len(response.Counts))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="CatalogObjectID" type="string" required>
+  ID of the CatalogObject to retrieve
+</ParamField>
+
+<ParamField path="LocationIDs" type="*string">
+  The Location IDs to look up as a comma-separated list. An empty list queries all locations.
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  A pagination cursor returned by a previous call to this endpoint. Provide this to retrieve the next set of results.
+</ParamField>
+
+### Response
+
+<ResponseField name="Counts" type="[]*square.InventoryCount">
+  The current calculated inventory counts for the requested object and locations
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to be used in a subsequent request
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Get Inventory Changes
+
+Returns a set of physical counts and inventory adjustments for the provided catalog object at the requested locations.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.ChangesInventoryRequest{
+        CatalogObjectID: "W62UWFY35CWMYGVWK6TWJDNI",
+        LocationIDs: square.String("L88917AVBK2S5"),
+    }
+
+    response, err := client.Inventory.GetInventoryChanges(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Retrieved %d changes\n", len(response.Changes))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="CatalogObjectID" type="string" required>
+  ID of the CatalogObject to retrieve
+</ParamField>
+
+<ParamField path="LocationIDs" type="*string">
+  The Location IDs to look up as a comma-separated list. An empty list queries all locations.
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  A pagination cursor returned by a previous call to this endpoint
+</ParamField>
+
+### Response
+
+<ResponseField name="Changes" type="[]*square.InventoryChange">
+  The set of inventory changes for the requested object and locations
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to be used in a subsequent request
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>
+
+## Get Inventory Adjustment
+
+Retrieves a specific inventory adjustment by its ID.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.GetAdjustmentInventoryRequest{
+        AdjustmentID: "UDSPTIHTLQHQK3H6FY3T6TB2",
+    }
+
+    response, err := client.Inventory.GetInventoryAdjustment(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Adjustment quantity: %s\n", *response.Adjustment.Quantity)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="AdjustmentID" type="string" required>
+  ID of the InventoryAdjustment to retrieve
+</ParamField>
+
+### Response
+
+<ResponseField name="Adjustment" type="*square.InventoryAdjustment">
+  The requested InventoryAdjustment
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Any errors that occurred during the request
+</ResponseField>

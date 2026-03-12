@@ -1,0 +1,374 @@
+---
+title: "Snippets"
+description: "Manage custom code snippets on Square Online sites with the Square Go SDK"
+---
+
+The Snippets API allows you to add, update, retrieve, and delete custom HTML and JavaScript code snippets on Square Online sites. Snippets are injected into the `<head>` element of all pages on the site, except checkout pages.
+
+<Note>
+  Square Online APIs are publicly available as part of an early access program. For more information, see [Early access program for Square Online APIs](https://developer.squareup.com/docs/online-api#early-access-program-for-square-online-apis).
+</Note>
+
+## Overview
+
+The `Snippets` client provides methods to:
+- Retrieve snippets from a site
+- Add or update snippets on a site
+- Delete snippets from a site
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+    "github.com/square/square-go-sdk/v3/core"
+)
+
+client := square.NewClient(
+    &core.RequestOptions{
+        Token: "YOUR_ACCESS_TOKEN",
+    },
+)
+```
+
+## Methods
+
+### Get Snippet
+
+Retrieves your snippet from a Square Online site. A site can contain snippets from multiple applications, but you can only retrieve the snippet added by your application.
+
+```go snippets/client.go
+request := &square.GetSnippetsRequest{
+    SiteID: "SITE_ID",
+}
+
+response, err := client.Snippets.Get(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+if response.Snippet != nil {
+    fmt.Printf("Snippet ID: %s\n", *response.Snippet.ID)
+    fmt.Printf("Content: %s\n", response.Snippet.Content)
+    fmt.Printf("Created: %s\n", *response.Snippet.CreatedAt)
+}
+```
+
+<ParamField path="siteID" type="string" required>
+  The ID of the site that contains the snippet. You can get site IDs using the [ListSites](/api-reference/sites) endpoint.
+</ParamField>
+
+<ResponseField name="snippet" type="Snippet">
+  The retrieved snippet object
+  
+  <Expandable title="Snippet Object">
+    <ResponseField name="id" type="string">
+      The Square-assigned ID for the snippet
+    </ResponseField>
+    
+    <ResponseField name="site_id" type="string">
+      The ID of the site that contains the snippet
+    </ResponseField>
+    
+    <ResponseField name="content" type="string" required>
+      The snippet code, which can contain valid HTML, JavaScript, or both
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      The timestamp when the snippet was initially added to the site, in RFC 3339 format
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      The timestamp when the snippet was last updated on the site, in RFC 3339 format
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Upsert Snippet
+
+Adds a snippet to a Square Online site or updates the existing snippet. The snippet code is appended to the end of the `<head>` element on every page of the site, except checkout pages. A snippet application can add **one snippet** to a given site.
+
+```go snippets/client.go
+request := &square.UpsertSnippetRequest{
+    SiteID: "SITE_ID",
+    Snippet: &square.Snippet{
+        Content: `<script>
+            // Google Analytics tracking code
+            (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+            (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+            m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+            })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+            ga('create', 'UA-XXXXX-Y', 'auto');
+            ga('send', 'pageview');
+        </script>`,
+    },
+}
+
+response, err := client.Snippets.Upsert(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Snippet ID: %s\n", *response.Snippet.ID)
+fmt.Printf("Updated: %s\n", *response.Snippet.UpdatedAt)
+```
+
+<ParamField path="siteID" type="string" required>
+  The ID of the site where you want to add or update the snippet
+</ParamField>
+
+<ParamField path="snippet" type="Snippet" required>
+  The snippet to add or update
+  
+  <Expandable title="Snippet Fields">
+    <ParamField path="content" type="string" required>
+      The snippet code. Can contain valid HTML, JavaScript, or both. This code will be injected into the `<head>` element of all site pages except checkout.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="snippet" type="Snippet">
+  The new or updated snippet
+</ResponseField>
+
+### Delete Snippet
+
+Removes your snippet from a Square Online site.
+
+```go snippets/client.go
+request := &square.DeleteSnippetsRequest{
+    SiteID: "SITE_ID",
+}
+
+response, err := client.Snippets.Delete(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Println("Snippet deleted successfully")
+```
+
+<ParamField path="siteID" type="string" required>
+  The ID of the site that contains the snippet to delete
+</ParamField>
+
+## Response Types
+
+### Snippet
+
+Represents a code snippet that is added to a Square Online site.
+
+<ResponseField name="id" type="string">
+  The Square-assigned ID for the snippet
+</ResponseField>
+
+<ResponseField name="site_id" type="string">
+  The ID of the site that contains the snippet
+</ResponseField>
+
+<ResponseField name="content" type="string" required>
+  The snippet code, which can contain valid HTML, JavaScript, or both. This content is injected into the `<head>` element of all pages on the site, except checkout pages.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  The timestamp when the snippet was initially added to the site, in RFC 3339 format
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  The timestamp when the snippet was last updated on the site, in RFC 3339 format
+</ResponseField>
+
+## Use Cases
+
+### Add Google Analytics Tracking
+
+```go
+// First, get the site ID
+sitesResponse, err := client.Sites.List(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+if len(sitesResponse.Sites) > 0 {
+    siteID := *sitesResponse.Sites[0].ID
+    
+    // Add Google Analytics snippet
+    request := &square.UpsertSnippetRequest{
+        SiteID: siteID,
+        Snippet: &square.Snippet{
+            Content: `<!-- Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=GA_MEASUREMENT_ID"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'GA_MEASUREMENT_ID');
+</script>`,
+        },
+    }
+    
+    response, err := client.Snippets.Upsert(context.TODO(), request)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println("Analytics tracking added!")
+}
+```
+
+### Add Meta Tags for SEO
+
+```go
+request := &square.UpsertSnippetRequest{
+    SiteID: "SITE_ID",
+    Snippet: &square.Snippet{
+        Content: `<!-- SEO Meta Tags -->
+<meta name="description" content="Your store description here">
+<meta name="keywords" content="keyword1, keyword2, keyword3">
+<meta property="og:title" content="Your Store Name">
+<meta property="og:description" content="Your store description">
+<meta property="og:image" content="https://yoursite.com/image.jpg">
+<meta name="twitter:card" content="summary_large_image">`,
+    },
+}
+
+response, err := client.Snippets.Upsert(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Add Facebook Pixel
+
+```go
+request := &square.UpsertSnippetRequest{
+    SiteID: "SITE_ID",
+    Snippet: &square.Snippet{
+        Content: `<!-- Facebook Pixel Code -->
+<script>
+  !function(f,b,e,v,n,t,s)
+  {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+  if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+  n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];
+  s.parentNode.insertBefore(t,s)}(window, document,'script',
+  'https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', 'YOUR_PIXEL_ID');
+  fbq('track', 'PageView');
+</script>
+<noscript>
+  <img height="1" width="1" style="display:none"
+       src="https://www.facebook.com/tr?id=YOUR_PIXEL_ID&ev=PageView&noscript=1"/>
+</noscript>`,
+    },
+}
+
+response, err := client.Snippets.Upsert(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Update an Existing Snippet
+
+```go
+// Retrieve the current snippet
+getRequest := &square.GetSnippetsRequest{
+    SiteID: "SITE_ID",
+}
+
+getResponse, err := client.Snippets.Get(context.TODO(), getRequest)
+if err != nil {
+    log.Fatal(err)
+}
+
+if getResponse.Snippet != nil {
+    // Update the snippet content
+    updateRequest := &square.UpsertSnippetRequest{
+        SiteID: "SITE_ID",
+        Snippet: &square.Snippet{
+            Content: getResponse.Snippet.Content + `\n<!-- Additional tracking code -->`,
+        },
+    }
+    
+    updateResponse, err := client.Snippets.Upsert(context.TODO(), updateRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println("Snippet updated successfully!")
+}
+```
+
+### Manage Snippets Across Multiple Sites
+
+```go
+// Get all sites
+sitesResponse, err := client.Sites.List(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+// Add the same snippet to all published sites
+snippetContent := `<script>console.log('Custom tracking');</script>`
+
+for _, site := range sitesResponse.Sites {
+    if *site.IsPublished {
+        request := &square.UpsertSnippetRequest{
+            SiteID: *site.ID,
+            Snippet: &square.Snippet{
+                Content: snippetContent,
+            },
+        }
+        
+        _, err := client.Snippets.Upsert(context.TODO(), request)
+        if err != nil {
+            fmt.Printf("Failed to add snippet to site %s: %v\n", *site.SiteTitle, err)
+            continue
+        }
+        
+        fmt.Printf("Snippet added to %s\n", *site.SiteTitle)
+    }
+}
+```
+
+## Error Handling
+
+```go
+response, err := client.Snippets.Get(context.TODO(), request)
+if err != nil {
+    // Check for API errors
+    if response != nil && len(response.Errors) > 0 {
+        for _, e := range response.Errors {
+            fmt.Printf("Error: %s - %s\n", e.Category, e.Detail)
+        }
+    }
+    return err
+}
+```
+
+## Important Notes
+
+<Warning>
+  Each application can only add **one snippet** per site. Calling `Upsert` multiple times will update the existing snippet rather than creating multiple snippets.
+</Warning>
+
+<Info>
+  Snippet code is injected into the `<head>` element of **all pages except checkout pages** for security reasons.
+</Info>
+
+<Tip>
+  Use the [Sites API](/api-reference/sites) to get site IDs before working with snippets.
+</Tip>
+
+<Note>
+  The Snippets API is part of an early access program and may be subject to changes.
+</Note>
+
+## Related Resources
+
+- [Square Online APIs Documentation](https://developer.squareup.com/docs/online-api)
+- [Sites API](/api-reference/sites)
+- [Early Access Program Information](https://developer.squareup.com/docs/online-api#early-access-program-for-square-online-apis)

@@ -1,0 +1,462 @@
+---
+title: "Bookings"
+description: "Manage appointments and scheduling for services"
+---
+
+The Bookings API allows you to create and manage appointments, search for booking availability, and handle booking profiles. This enables you to build scheduling experiences for service-based businesses.
+
+## Overview
+
+The Bookings client provides methods for:
+- Creating and managing bookings (appointments)
+- Searching for available booking slots
+- Retrieving and updating booking profiles
+- Managing custom attributes for bookings
+- Bulk operations on bookings
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### List Bookings
+
+Retrieves a collection of bookings.
+
+```go bookings.go:1230
+request := &square.ListBookingsRequest{
+    Limit: square.Int(100),
+    Cursor: square.String("cursor"),
+    CustomerID: square.String("customer_id"),
+    TeamMemberID: square.String("team_member_id"),
+    LocationID: square.String("location_id"),
+    StartAtMin: square.String("2024-03-01T00:00:00Z"),
+    StartAtMax: square.String("2024-03-31T23:59:59Z"),
+}
+response, err := client.Bookings.List(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="limit" type="int">
+  The maximum number of results per page to return.
+</ParamField>
+
+<ParamField path="cursor" type="string">
+  The pagination cursor from the preceding response to return the next page of the results.
+</ParamField>
+
+<ParamField path="customerID" type="string">
+  The customer for whom to retrieve bookings.
+</ParamField>
+
+<ParamField path="teamMemberID" type="string">
+  The team member for whom to retrieve bookings.
+</ParamField>
+
+<ParamField path="locationID" type="string">
+  The location for which to retrieve bookings.
+</ParamField>
+
+<ParamField path="startAtMin" type="string">
+  The RFC 3339 timestamp specifying the earliest of the start time.
+</ParamField>
+
+<ParamField path="startAtMax" type="string">
+  The RFC 3339 timestamp specifying the latest of the start time.
+</ParamField>
+
+<ResponseField name="bookings" type="[]Booking">
+  The list of bookings.
+</ResponseField>
+
+### Create Booking
+
+Creates a booking.
+
+```go bookings.go:1350
+request := &square.CreateBookingRequest{
+    Booking: &square.Booking{
+        LocationID: square.String("L1234567890"),
+        StartAt: square.String("2024-03-15T10:00:00Z"),
+        CustomerID: square.String("CUSTOMER_ID"),
+        AppointmentSegments: []*square.AppointmentSegment{
+            &square.AppointmentSegment{
+                TeamMemberID: square.String("TEAM_MEMBER_ID"),
+                ServiceVariationID: square.String("SERVICE_VAR_ID"),
+                ServiceVariationVersion: square.Int64(1),
+            },
+        },
+    },
+}
+response, err := client.Bookings.Create(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="booking" type="Booking" required>
+  The booking to create. Required fields:
+  - `location_id`
+  - `start_at`
+  - `appointment_segments` with `team_member_id`, `service_variation_id`, and `service_variation_version`
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string">
+  A unique key to make this request an idempotent operation.
+</ParamField>
+
+<ResponseField name="booking" type="Booking">
+  The created booking.
+</ResponseField>
+
+### Get Booking
+
+Retrieves a booking.
+
+```go bookings.go:1723
+request := &square.GetBookingsRequest{
+    BookingID: "booking_id",
+}
+response, err := client.Bookings.Get(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="bookingID" type="string" required>
+  The ID of the booking to retrieve.
+</ParamField>
+
+<ResponseField name="booking" type="Booking">
+  The requested booking.
+</ResponseField>
+
+### Update Booking
+
+Updates a booking.
+
+```go bookings.go:1790
+request := &square.UpdateBookingRequest{
+    BookingID: "booking_id",
+    Booking: &square.Booking{
+        StartAt: square.String("2024-03-15T14:00:00Z"),
+        CustomerNote: square.String("Please arrive 10 minutes early"),
+    },
+}
+response, err := client.Bookings.Update(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="bookingID" type="string" required>
+  The ID of the booking to update.
+</ParamField>
+
+<ParamField path="booking" type="Booking" required>
+  The booking fields to update.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string">
+  A unique key to make this request an idempotent operation.
+</ParamField>
+
+<ResponseField name="booking" type="Booking">
+  The updated booking.
+</ResponseField>
+
+### Cancel Booking
+
+Cancels an existing booking.
+
+```go bookings.go:1872
+request := &square.CancelBookingRequest{
+    BookingID: "booking_id",
+}
+response, err := client.Bookings.Cancel(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="bookingID" type="string" required>
+  The ID of the booking to cancel.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string">
+  A unique key to make this request an idempotent operation.
+</ParamField>
+
+<ParamField path="bookingVersion" type="int">
+  The revision number for the booking used for optimistic concurrency.
+</ParamField>
+
+<ResponseField name="booking" type="Booking">
+  The canceled booking.
+</ResponseField>
+
+### Search Availability
+
+Searches for availabilities for booking.
+
+```go bookings.go:1427
+request := &square.SearchAvailabilityRequest{
+    Query: &square.SearchAvailabilityQuery{
+        Filter: &square.SearchAvailabilityFilter{
+            StartAtRange: &square.TimeRange{
+                StartAt: square.String("2024-03-15T00:00:00Z"),
+                EndAt: square.String("2024-03-15T23:59:59Z"),
+            },
+            LocationID: square.String("L1234567890"),
+            SegmentFilters: []*square.SegmentFilter{
+                &square.SegmentFilter{
+                    ServiceVariationID: square.String("SERVICE_VAR_ID"),
+                    TeamMemberIDFilter: &square.FilterValue{
+                        Any: []string{"TEAM_MEMBER_ID"},
+                    },
+                },
+            },
+        },
+    },
+}
+response, err := client.Bookings.SearchAvailability(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="query.filter.startAtRange" type="TimeRange" required>
+  The time range to search for availability.
+</ParamField>
+
+<ParamField path="query.filter.locationID" type="string">
+  The location for which to search availability.
+</ParamField>
+
+<ParamField path="query.filter.segmentFilters" type="[]SegmentFilter">
+  Filters for service variations and team members.
+</ParamField>
+
+<ResponseField name="availabilities" type="[]Availability">
+  The available booking slots.
+</ResponseField>
+
+### Bulk Retrieve Bookings
+
+Bulk-retrieves a list of bookings by booking IDs.
+
+```go bookings.go:1493
+request := &square.BulkRetrieveBookingsRequest{
+    BookingIDs: []string{
+        "booking_id_1",
+        "booking_id_2",
+    },
+}
+response, err := client.Bookings.BulkRetrieveBookings(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="bookingIDs" type="[]string" required>
+  A non-empty list of booking IDs specifying bookings to retrieve.
+</ParamField>
+
+<ResponseField name="bookings" type="map[string]*Booking">
+  The retrieved bookings, keyed by booking ID.
+</ResponseField>
+
+## Booking Profiles
+
+### Get Business Booking Profile
+
+Retrieves a seller's booking profile.
+
+```go bookings.go:1551
+response, err := client.Bookings.GetBusinessProfile(
+    context.TODO(),
+)
+```
+
+<ResponseField name="businessBookingProfile" type="BusinessBookingProfile">
+  The seller's booking profile configuration.
+</ResponseField>
+
+### Retrieve Location Booking Profile
+
+Retrieves a seller's location booking profile.
+
+```go bookings.go:1595
+request := &square.RetrieveLocationBookingProfileRequest{
+    LocationID: "location_id",
+}
+response, err := client.Bookings.RetrieveLocationBookingProfile(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="locationID" type="string" required>
+  The ID of the location to retrieve the booking profile.
+</ParamField>
+
+<ResponseField name="locationBookingProfile" type="LocationBookingProfile">
+  The location's booking profile.
+</ResponseField>
+
+### Bulk Retrieve Team Member Booking Profiles
+
+Retrieves one or more team members' booking profiles.
+
+```go bookings.go:1659
+request := &square.BulkRetrieveTeamMemberBookingProfilesRequest{
+    TeamMemberIDs: []string{
+        "team_member_id_1",
+        "team_member_id_2",
+    },
+}
+response, err := client.Bookings.BulkRetrieveTeamMemberBookingProfiles(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="teamMemberIDs" type="[]string" required>
+  A non-empty list of IDs of team members whose booking profiles you want to retrieve.
+</ParamField>
+
+<ResponseField name="teamMemberBookingProfiles" type="map[string]*TeamMemberBookingProfile">
+  The team member booking profiles, keyed by team member ID.
+</ResponseField>
+
+## Use Cases
+
+### Create an Appointment
+
+Book a service appointment for a customer:
+
+```go
+request := &square.CreateBookingRequest{
+    IdempotencyKey: square.String(uuid.New().String()),
+    Booking: &square.Booking{
+        LocationID: square.String("L1234567890"),
+        StartAt: square.String("2024-03-15T10:00:00Z"),
+        CustomerID: square.String("CUSTOMER_123"),
+        AppointmentSegments: []*square.AppointmentSegment{
+            &square.AppointmentSegment{
+                DurationMinutes: square.Int(60),
+                TeamMemberID: square.String("TEAM_MEMBER_456"),
+                ServiceVariationID: square.String("SERVICE_789"),
+                ServiceVariationVersion: square.Int64(1),
+            },
+        },
+        CustomerNote: square.String("First time customer"),
+    },
+}
+
+response, err := client.Bookings.Create(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Booking created: %s\n", *response.Booking.ID)
+```
+
+### Find Available Time Slots
+
+Search for available appointment times:
+
+```go
+request := &square.SearchAvailabilityRequest{
+    Query: &square.SearchAvailabilityQuery{
+        Filter: &square.SearchAvailabilityFilter{
+            StartAtRange: &square.TimeRange{
+                StartAt: square.String("2024-03-15T09:00:00Z"),
+                EndAt: square.String("2024-03-15T17:00:00Z"),
+            },
+            LocationID: square.String("L1234567890"),
+            SegmentFilters: []*square.SegmentFilter{
+                &square.SegmentFilter{
+                    ServiceVariationID: square.String("SERVICE_789"),
+                },
+            },
+        },
+    },
+}
+
+response, err := client.Bookings.SearchAvailability(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, availability := range response.Availabilities {
+    fmt.Printf("Available at: %s\n", *availability.StartAt)
+}
+```
+
+### Reschedule Appointment
+
+Update an existing booking to a new time:
+
+```go
+request := &square.UpdateBookingRequest{
+    BookingID: "BOOKING_ID",
+    IdempotencyKey: square.String(uuid.New().String()),
+    Booking: &square.Booking{
+        StartAt: square.String("2024-03-16T14:00:00Z"),
+        Version: square.Int(currentVersion),
+    },
+}
+
+response, err := client.Bookings.Update(context.TODO(), request)
+```
+
+## Permissions
+
+<Info>
+  **Buyer-level permissions**: Set `APPOINTMENTS_READ` or `APPOINTMENTS_WRITE` OAuth scope.
+  
+  **Seller-level permissions**: Set both `APPOINTMENTS_ALL_READ` and `APPOINTMENTS_READ` (or `APPOINTMENTS_ALL_WRITE` and `APPOINTMENTS_WRITE`).
+  
+  For seller-level write operations, the seller must have subscribed to *Appointments Plus* or *Appointments Premium*.
+</Info>
+
+## Best Practices
+
+- **Use idempotency keys**: Prevent duplicate bookings with unique keys
+- **Validate availability**: Always search for availability before creating bookings
+- **Handle time zones**: Use RFC 3339 format with proper time zones
+- **Check capacity**: Ensure team members have capacity before booking
+- **Add customer notes**: Include relevant information in customer notes
+- **Track versions**: Use version numbers for optimistic concurrency control
+- **Implement reminders**: Send booking confirmations and reminders to customers
+
+## Booking Status
+
+Bookings can have the following statuses:
+
+- `PENDING` - Booking is pending confirmation
+- `ACCEPTED` - Booking has been accepted
+- `CANCELLED_BY_CUSTOMER` - Customer canceled the booking
+- `CANCELLED_BY_SELLER` - Seller canceled the booking
+- `DECLINED` - Booking was declined
+- `NO_SHOW` - Customer did not show up
+
+## Related Resources
+
+- [Catalog API](/api-reference/catalog) - For service definitions
+- [Customers API](/api-reference/customers)
+- [Team API](/api-reference/team)
+- [Locations API](/api-reference/locations)

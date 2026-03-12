@@ -1,0 +1,182 @@
+---
+title: "Checkout API"
+description: "Manage checkout settings and configurations with the Square Go SDK"
+---
+
+The Checkout API allows you to retrieve and update location-level and merchant-level settings for Square-hosted checkout pages.
+
+## Client Methods
+
+### Retrieve Location Settings
+
+Retrieves the location-level settings for a Square-hosted checkout page.
+
+```go
+client.Checkout.RetrieveLocationSettings(ctx context.Context, request *square.RetrieveLocationSettingsRequest) (*square.RetrieveLocationSettingsResponse, error)
+```
+
+<ParamField path="LocationID" type="string" required>
+  The ID of the location for which to retrieve settings.
+</ParamField>
+
+<ResponseField name="response" type="*square.RetrieveLocationSettingsResponse">
+  Contains the checkout location settings including branding, tipping, and payment options
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.RetrieveLocationSettingsRequest{
+    LocationID: "location_id",
+}
+
+response, err := client.Checkout.RetrieveLocationSettings(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Access location settings
+if response.LocationSettings != nil {
+    fmt.Printf("Branding Enabled: %v\n", response.LocationSettings.Branding)
+    fmt.Printf("Tipping Enabled: %v\n", response.LocationSettings.Tipping)
+}
+```
+</CodeGroup>
+
+---
+
+### Update Location Settings
+
+Updates the location-level settings for a Square-hosted checkout page.
+
+```go
+client.Checkout.UpdateLocationSettings(ctx context.Context, request *square.UpdateLocationSettingsRequest) (*square.UpdateLocationSettingsResponse, error)
+```
+
+<ParamField path="request" type="*square.UpdateLocationSettingsRequest" required>
+  <Expandable title="properties">
+    <ParamField path="LocationID" type="string" required>
+      The ID of the location for which to update settings.
+    </ParamField>
+    
+    <ParamField path="LocationSettings" type="*square.CheckoutLocationSettings" required>
+      The location settings object containing only the fields that have changed.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.UpdateLocationSettingsResponse">
+  The updated checkout location settings
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.UpdateLocationSettingsRequest{
+    LocationID: "location_id",
+    LocationSettings: &square.CheckoutLocationSettings{
+        // Specify only the fields you want to update
+        CustomerNotesEnabled: square.Bool(true),
+    },
+}
+
+response, err := client.Checkout.UpdateLocationSettings(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+---
+
+### Retrieve Merchant Settings
+
+Retrieves the merchant-level settings for a Square-hosted checkout page.
+
+```go
+client.Checkout.RetrieveMerchantSettings(ctx context.Context) (*square.RetrieveMerchantSettingsResponse, error)
+```
+
+<ResponseField name="response" type="*square.RetrieveMerchantSettingsResponse">
+  Contains the merchant-wide checkout settings
+</ResponseField>
+
+<CodeGroup>
+```go Example
+response, err := client.Checkout.RetrieveMerchantSettings(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+// Access merchant settings
+if response.MerchantSettings != nil {
+    fmt.Printf("Default Payment Methods: %v\n", response.MerchantSettings.PaymentMethods)
+}
+```
+</CodeGroup>
+
+---
+
+### Update Merchant Settings
+
+Updates the merchant-level settings for a Square-hosted checkout page.
+
+```go
+client.Checkout.UpdateMerchantSettings(ctx context.Context, request *square.UpdateMerchantSettingsRequest) (*square.UpdateMerchantSettingsResponse, error)
+```
+
+<ParamField path="MerchantSettings" type="*square.CheckoutMerchantSettings" required>
+  The merchant settings object containing only the fields that have changed.
+</ParamField>
+
+<ResponseField name="response" type="*square.UpdateMerchantSettingsResponse">
+  The updated merchant checkout settings
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.UpdateMerchantSettingsRequest{
+    MerchantSettings: &square.CheckoutMerchantSettings{
+        // Specify only the fields you want to update
+    },
+}
+
+response, err := client.Checkout.UpdateMerchantSettings(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+## Checkout Settings
+
+### Location Settings
+
+Location-level settings control checkout behavior for a specific location:
+
+- **Branding**: Customize the appearance of checkout pages
+- **Tipping**: Enable or configure tipping options
+- **Coupons**: Enable coupon support
+- **Customer Notes**: Allow customers to add notes to orders
+- **Payment Methods**: Configure accepted payment methods
+
+### Merchant Settings
+
+Merchant-level settings apply across all locations:
+
+- **Payment Methods**: Default payment methods accepted
+- **Policies**: Terms of service and privacy policy links
+- **Checkout URL**: Custom domain for hosted checkout pages
+
+## Key Concepts
+
+### Partial Updates
+
+When updating settings, include only the fields you want to change. Omitted fields will retain their current values.
+
+### Settings Hierarchy
+
+Location-level settings override merchant-level settings for specific locations. This allows you to customize checkout experiences per location while maintaining global defaults.
+
+## Learn More
+
+- [Square Checkout API Documentation](https://developer.squareup.com/docs/checkout-api/overview)
+- [Customize Checkout Pages](https://developer.squareup.com/docs/checkout-api/customize)

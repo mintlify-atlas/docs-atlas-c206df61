@@ -1,0 +1,424 @@
+---
+title: "Webhooks API"
+description: "Manage webhook subscriptions to receive real-time event notifications"
+---
+
+The Webhooks API allows you to create and manage webhook subscriptions that notify your application when specific events occur in a Square account. This enables real-time integrations and automated workflows.
+
+## Overview
+
+The Webhooks client provides methods for:
+- Creating and managing webhook subscriptions
+- Listing available webhook event types
+- Testing webhook configurations
+- Updating signature keys for security
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+    "github.com/square/square-go-sdk/square/webhooks"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Webhook Subscriptions
+
+### List Subscriptions
+
+Lists all webhook subscriptions owned by your application.
+
+```go webhooks.go:29858
+request := &webhooks.ListSubscriptionsRequest{
+    Cursor: square.String("cursor"),
+    IncludeDisabled: square.Bool(true),
+    SortOrder: square.SortOrderDesc.Ptr(),
+    Limit: square.Int(100),
+}
+response, err := client.Webhooks.Subscriptions.List(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="cursor" type="string">
+  A pagination cursor returned by a previous call to this endpoint. Provide this to retrieve the next set of results.
+</ParamField>
+
+<ParamField path="includeDisabled" type="bool">
+  Includes disabled subscriptions. By default, all enabled subscriptions are returned.
+</ParamField>
+
+<ParamField path="sortOrder" type="SortOrder">
+  Sorts the returned list by when the subscription was created. Defaults to ASC.
+</ParamField>
+
+<ParamField path="limit" type="int">
+  The maximum number of results to return in a single page. Default and maximum value is 100.
+</ParamField>
+
+<ResponseField name="subscriptions" type="[]WebhookSubscription">
+  The list of webhook subscriptions.
+</ResponseField>
+
+### Create Subscription
+
+Creates a webhook subscription.
+
+```go webhooks.go:29977
+request := &webhooks.CreateWebhookSubscriptionRequest{
+    IdempotencyKey: square.String("63f84c6c-2200-4c99-846c-2670a1311fbf"),
+    Subscription: &square.WebhookSubscription{
+        Name: square.String("Example Webhook Subscription"),
+        EventTypes: []string{
+            "payment.created",
+            "payment.updated",
+        },
+        NotificationURL: square.String("https://example-webhook-url.com"),
+        APIVersion: square.String("2021-12-15"),
+    },
+}
+response, err := client.Webhooks.Subscriptions.Create(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="idempotencyKey" type="string">
+  A unique string that identifies the CreateWebhookSubscription request.
+</ParamField>
+
+<ParamField path="subscription" type="WebhookSubscription" required>
+  The webhook subscription to create.
+</ParamField>
+
+<ParamField path="subscription.name" type="string">
+  A human-readable name for the subscription.
+</ParamField>
+
+<ParamField path="subscription.eventTypes" type="[]string" required>
+  The event types to subscribe to (e.g., "payment.created", "order.updated").
+</ParamField>
+
+<ParamField path="subscription.notificationURL" type="string" required>
+  The URL to which webhook notifications are sent.
+</ParamField>
+
+<ParamField path="subscription.apiVersion" type="string">
+  The API version to use for webhook payloads.
+</ParamField>
+
+<ResponseField name="subscription" type="WebhookSubscription">
+  The created webhook subscription including the signature key.
+</ResponseField>
+
+### Get Subscription
+
+Retrieves a webhook subscription identified by its ID.
+
+```go webhooks.go:30046
+request := &webhooks.GetSubscriptionsRequest{
+    SubscriptionID: "subscription_id",
+}
+response, err := client.Webhooks.Subscriptions.Get(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="subscriptionID" type="string" required>
+  The ID of the webhook subscription to retrieve.
+</ParamField>
+
+<ResponseField name="subscription" type="WebhookSubscription">
+  The requested webhook subscription.
+</ResponseField>
+
+### Update Subscription
+
+Updates a webhook subscription.
+
+```go webhooks.go:30114
+request := &webhooks.UpdateWebhookSubscriptionRequest{
+    SubscriptionID: "subscription_id",
+    Subscription: &square.WebhookSubscription{
+        Name: square.String("Updated Example Webhook Subscription"),
+        Enabled: square.Bool(false),
+    },
+}
+response, err := client.Webhooks.Subscriptions.Update(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="subscriptionID" type="string" required>
+  The ID of the webhook subscription to update.
+</ParamField>
+
+<ParamField path="subscription" type="WebhookSubscription" required>
+  The webhook subscription fields to update.
+</ParamField>
+
+<ResponseField name="subscription" type="WebhookSubscription">
+  The updated webhook subscription.
+</ResponseField>
+
+### Delete Subscription
+
+Deletes a webhook subscription.
+
+```go webhooks.go:30183
+request := &webhooks.DeleteSubscriptionsRequest{
+    SubscriptionID: "subscription_id",
+}
+response, err := client.Webhooks.Subscriptions.Delete(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="subscriptionID" type="string" required>
+  The ID of the webhook subscription to delete.
+</ParamField>
+
+### Update Signature Key
+
+Updates a webhook subscription by replacing the existing signature key with a new one.
+
+```go webhooks.go:30244
+request := &webhooks.UpdateWebhookSubscriptionSignatureKeyRequest{
+    SubscriptionID: "subscription_id",
+    IdempotencyKey: square.String("ed80ae6b-0654-473b-bbab-a39aee89a60d"),
+}
+response, err := client.Webhooks.Subscriptions.UpdateSignatureKey(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="subscriptionID" type="string" required>
+  The ID of the webhook subscription to update.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string">
+  A unique string that identifies the UpdateWebhookSubscriptionSignatureKey request.
+</ParamField>
+
+<ResponseField name="subscription" type="WebhookSubscription">
+  The webhook subscription with the new signature key.
+</ResponseField>
+
+### Test Subscription
+
+Tests a webhook subscription by sending a test event to the notification URL.
+
+```go webhooks.go:30317
+request := &webhooks.TestWebhookSubscriptionRequest{
+    SubscriptionID: "subscription_id",
+    EventType: square.String("payment.created"),
+}
+response, err := client.Webhooks.Subscriptions.Test(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="subscriptionID" type="string" required>
+  The ID of the webhook subscription to test.
+</ParamField>
+
+<ParamField path="eventType" type="string">
+  The event type to use for testing. Must be contained in the subscription's event types list.
+</ParamField>
+
+<ResponseField name="success" type="bool">
+  Indicates whether the test was successful.
+</ResponseField>
+
+## Event Types
+
+### List Event Types
+
+Lists all webhook event types that can be subscribed to.
+
+```go webhooks.go:29787
+request := &webhooks.ListEventTypesRequest{
+    APIVersion: square.String("2021-12-15"),
+}
+response, err := client.Webhooks.EventTypes.List(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="apiVersion" type="string">
+  The API version for which to list event types. Setting this field overrides the default version used by the application.
+</ParamField>
+
+<ResponseField name="eventTypes" type="[]string">
+  The list of available event types.
+</ResponseField>
+
+<ResponseField name="metadata" type="[]EventTypeMetadata">
+  Metadata about each event type.
+</ResponseField>
+
+## Use Cases
+
+### Subscribe to Payment Events
+
+Receive notifications when payments are created or updated:
+
+```go
+request := &webhooks.CreateWebhookSubscriptionRequest{
+    IdempotencyKey: square.String(uuid.New().String()),
+    Subscription: &square.WebhookSubscription{
+        Name: square.String("Payment Events"),
+        EventTypes: []string{
+            "payment.created",
+            "payment.updated",
+        },
+        NotificationURL: square.String("https://api.example.com/webhooks/square"),
+        APIVersion: square.String("2021-12-15"),
+    },
+}
+
+response, err := client.Webhooks.Subscriptions.Create(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Store the signature key for validating webhook notifications
+signatureKey := response.Subscription.SignatureKey
+```
+
+### Validate Webhook Signatures
+
+Verify that webhook notifications are authentic:
+
+```go
+import (
+    "crypto/hmac"
+    "crypto/sha256"
+    "encoding/base64"
+)
+
+func validateWebhookSignature(body []byte, signature string, signatureKey string) bool {
+    // Create HMAC-SHA256 hash
+    h := hmac.New(sha256.New, []byte(signatureKey))
+    h.Write(body)
+    
+    // Base64 encode the hash
+    expectedSignature := base64.StdEncoding.EncodeToString(h.Sum(nil))
+    
+    // Compare signatures
+    return hmac.Equal([]byte(signature), []byte(expectedSignature))
+}
+
+// In your webhook handler
+func webhookHandler(w http.ResponseWriter, r *http.Request) {
+    body, _ := ioutil.ReadAll(r.Body)
+    signature := r.Header.Get("X-Square-Signature")
+    
+    if !validateWebhookSignature(body, signature, signatureKey) {
+        http.Error(w, "Invalid signature", http.StatusUnauthorized)
+        return
+    }
+    
+    // Process the webhook event
+    // ...
+}
+```
+
+### Monitor Order Updates
+
+Track changes to orders in real-time:
+
+```go
+request := &webhooks.CreateWebhookSubscriptionRequest{
+    IdempotencyKey: square.String(uuid.New().String()),
+    Subscription: &square.WebhookSubscription{
+        Name: square.String("Order Updates"),
+        EventTypes: []string{
+            "order.created",
+            "order.updated",
+            "order.fulfilled",
+        },
+        NotificationURL: square.String("https://api.example.com/webhooks/orders"),
+        APIVersion: square.String("2021-12-15"),
+    },
+}
+
+response, err := client.Webhooks.Subscriptions.Create(context.TODO(), request)
+```
+
+## Best Practices
+
+- **Validate signatures**: Always verify webhook signatures to ensure authenticity
+- **Handle idempotency**: Process webhook events idempotently to handle duplicate notifications
+- **Respond quickly**: Return a 200 OK response within 10 seconds to avoid retries
+- **Use HTTPS**: Always use HTTPS URLs for webhook endpoints
+- **Test subscriptions**: Use the test endpoint to verify your webhook handler works correctly
+- **Monitor failures**: Check webhook delivery logs and handle failed notifications
+- **Rotate signature keys**: Periodically update signature keys for security
+
+## Common Event Types
+
+- `payment.created` - A new payment was created
+- `payment.updated` - A payment was updated
+- `order.created` - A new order was created
+- `order.updated` - An order was updated
+- `order.fulfilled` - An order was fulfilled
+- `refund.created` - A refund was created
+- `refund.updated` - A refund was updated
+- `customer.created` - A new customer was created
+- `customer.updated` - A customer was updated
+- `inventory.count.updated` - Inventory count was updated
+
+## Security Considerations
+
+<Warning>
+  Always validate webhook signatures using the signature key provided when you create the subscription. This ensures that notifications are actually from Square.
+</Warning>
+
+- Store signature keys securely (encrypted at rest)
+- Use HTTPS for all webhook endpoints
+- Implement rate limiting on your webhook endpoints
+- Log and monitor webhook failures
+- Rotate signature keys periodically
+
+## Error Handling
+
+Square will retry failed webhook deliveries with exponential backoff:
+
+- Initial retry: 5 seconds
+- Subsequent retries: Exponential backoff up to 1 hour
+- Maximum retries: 24 hours
+
+```go
+// Handle webhook processing errors gracefully
+func processWebhook(event WebhookEvent) error {
+    // Process the event
+    if err := handleEvent(event); err != nil {
+        // Log the error
+        log.Printf("Error processing webhook: %v", err)
+        
+        // Return error to trigger retry
+        return err
+    }
+    
+    return nil
+}
+```
+
+## Related Resources
+
+- [Events API](/api-reference/events)
+- [Webhook Events Guide](https://developer.squareup.com/docs/webhooks/overview)
+- [Webhook Signatures](https://developer.squareup.com/docs/webhooks/validate)

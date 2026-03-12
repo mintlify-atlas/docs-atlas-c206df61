@@ -1,0 +1,577 @@
+---
+title: "Subscriptions"
+description: "Manage recurring payment subscriptions with the Square Go SDK"
+---
+
+The Subscriptions API enables you to create and manage recurring payment subscriptions for your customers. Use this API to set up subscription plans, manage customer subscriptions, and handle billing cycles.
+
+## Available Methods
+
+The Subscriptions client provides the following methods:
+
+- `CreateSubscription` - Create a new subscription for a customer
+- `SearchSubscriptions` - Search for subscriptions with filters
+- `GetSubscription` - Retrieve a subscription by ID
+- `UpdateSubscription` - Update an existing subscription
+- `CancelSubscription` - Cancel a subscription
+- `PauseSubscription` - Temporarily pause a subscription
+- `ResumeSubscription` - Resume a paused subscription
+- `SwapPlan` - Change a subscription's plan
+- `BulkSwapPlan` - Change plans for multiple subscriptions
+- `ChangeBillingAnchorDate` - Change the billing anchor date
+- `DeleteSubscriptionAction` - Delete a scheduled action
+- `ListSubscriptionEvents` - List events for a subscription
+
+## Create Subscription
+
+Creates a subscription to a subscription plan by a customer. The required input includes the plan variation ID, customer ID, and location ID.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.CreateSubscriptionRequest{
+        IdempotencyKey: square.String("8193148c-9586-11e6-99f9-28cfe92138cf"),
+        LocationID: "S8GWD5R9QB376",
+        PlanVariationID: square.String("6JHXF3B2CW3YKHDV4XEM674H"),
+        CustomerID: "CHFGVKYY8RSV93M5KCYTG4PN0G",
+        StartDate: square.String("2023-06-20"),
+        TaxPercentage: square.String("5"),
+        PriceOverrideMoney: &square.Money{
+            Amount: square.Int64(2000),
+            Currency: square.CurrencyUsd.Ptr(),
+        },
+        CardID: square.String("ccof:customer-card-id"),
+        Timezone: square.String("America/Los_Angeles"),
+    }
+
+    response, err := client.Subscriptions.CreateSubscription(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Subscription created: %s\n", *response.Subscription.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="LocationID" type="string" required>
+  The ID of the location the subscription is associated with
+</ParamField>
+
+<ParamField path="PlanVariationID" type="*string">
+  The ID of the subscription plan variation created using the Catalog API
+</ParamField>
+
+<ParamField path="CustomerID" type="string" required>
+  The ID of the customer subscribing to the subscription plan variation
+</ParamField>
+
+<ParamField path="IdempotencyKey" type="*string">
+  A unique string that identifies this CreateSubscription request. See [Idempotency](https://developer.squareup.com/docs/build-basics/common-api-patterns/idempotency) for more information.
+</ParamField>
+
+<ParamField path="StartDate" type="*string">
+  The YYYY-MM-DD-formatted date to start the subscription. If it is unspecified, the subscription starts immediately.
+</ParamField>
+
+<ParamField path="CanceledDate" type="*string">
+  The YYYY-MM-DD-formatted date when the newly created subscription is scheduled for cancellation
+</ParamField>
+
+<ParamField path="TaxPercentage" type="*string">
+  The tax to add when billing the subscription. The percentage is expressed in decimal form, using a '.' as the decimal separator and without a '%' sign.
+</ParamField>
+
+<ParamField path="PriceOverrideMoney" type="*square.Money">
+  A custom price which overrides the cost of a subscription plan variation with STATIC pricing
+</ParamField>
+
+<ParamField path="CardID" type="*string">
+  The ID of the subscriber's card to charge. If it is not specified, the subscriber receives an invoice via email with a link to pay for their subscription.
+</ParamField>
+
+<ParamField path="Timezone" type="*string">
+  The timezone that is used in date calculations for the subscription. Format: the IANA Timezone Database identifier for the location timezone.
+</ParamField>
+
+<ParamField path="Source" type="*square.SubscriptionSource">
+  The origination details of the subscription
+</ParamField>
+
+<ParamField path="MonthlyBillingAnchorDate" type="*int">
+  The day-of-the-month to change the billing date to
+</ParamField>
+
+<ParamField path="Phases" type="[]*square.Phase">
+  Array of phases for this subscription
+</ParamField>
+
+### Response
+
+<ResponseField name="Subscription" type="*square.Subscription">
+  The newly created subscription. For more information, see the [Subscription object](https://developer.squareup.com/docs/subscriptions-api/manage-subscriptions#subscription-object).
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>
+
+## Search Subscriptions
+
+Searches for subscriptions with filtering and sorting options. Returns a paginated list of subscriptions.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.SearchSubscriptionsRequest{
+        Query: &square.SearchSubscriptionsQuery{
+            Filter: &square.SearchSubscriptionsFilter{
+                CustomerIDs: []string{"CHFGVKYY8RSV93M5KCYTG4PN0G"},
+                LocationIDs: []string{"S8GWD5R9QB376"},
+            },
+        },
+        Limit: square.Int(10),
+        Include: []string{"actions"},
+    }
+
+    response, err := client.Subscriptions.SearchSubscriptions(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Found %d subscriptions\n", len(response.Subscriptions))
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="Query" type="*square.SearchSubscriptionsQuery">
+  A subscription query consisting of specified filtering conditions. If this query field is unspecified, the SearchSubscriptions call will return all subscriptions.
+</ParamField>
+
+<ParamField path="Limit" type="*int">
+  The upper limit on the number of subscriptions to return in a paged response
+</ParamField>
+
+<ParamField path="Cursor" type="*string">
+  When the total number of resulting subscriptions exceeds the limit of a paged response, specify the cursor returned from a preceding response to fetch the next set of results.
+</ParamField>
+
+<ParamField path="Include" type="[]string">
+  An option to include related information in the response. The supported values are: actions - to include scheduled actions on the targeted subscriptions.
+</ParamField>
+
+### Response
+
+<ResponseField name="Subscriptions" type="[]*square.Subscription">
+  The subscriptions matching the query
+</ResponseField>
+
+<ResponseField name="Cursor" type="*string">
+  The pagination cursor to retrieve the next set of results
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>
+
+## Get Subscription
+
+Retrieves a specific subscription by ID.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.GetSubscriptionsRequest{
+        SubscriptionID: "8151d94c-5c8e-4fd1-8e45-63716b49e7ab",
+        Include: square.String("actions"),
+    }
+
+    response, err := client.Subscriptions.GetSubscription(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Subscription: %s\n", *response.Subscription.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="SubscriptionID" type="string" required>
+  The ID of the subscription to retrieve
+</ParamField>
+
+<ParamField path="Include" type="*string">
+  A query parameter to specify related information to be included in the response. Supported values: actions - to include scheduled actions on the targeted subscription.
+</ParamField>
+
+### Response
+
+<ResponseField name="Subscription" type="*square.Subscription">
+  The requested subscription
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>
+
+## Cancel Subscription
+
+Schedules a subscription for cancellation. The subscription continues until the end of the current billing cycle.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.CancelSubscriptionsRequest{
+        SubscriptionID: "8151d94c-5c8e-4fd1-8e45-63716b49e7ab",
+    }
+
+    response, err := client.Subscriptions.CancelSubscription(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Subscription canceled: %s\n", *response.Subscription.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="SubscriptionID" type="string" required>
+  The ID of the subscription to cancel
+</ParamField>
+
+### Response
+
+<ResponseField name="Subscription" type="*square.Subscription">
+  The specified subscription scheduled for cancellation according to the action created by the request
+</ResponseField>
+
+<ResponseField name="Actions" type="[]*square.SubscriptionAction">
+  A list of a single CANCEL action scheduled for the subscription
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>
+
+## Pause Subscription
+
+Pauses a subscription. The subscription is paused at the beginning of the next billing cycle.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.PauseSubscriptionRequest{
+        SubscriptionID: "8151d94c-5c8e-4fd1-8e45-63716b49e7ab",
+        PauseEffectiveDate: square.String("2023-07-01"),
+        PauseReason: square.String("Customer requested pause"),
+    }
+
+    response, err := client.Subscriptions.PauseSubscription(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Subscription paused: %s\n", *response.Subscription.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="SubscriptionID" type="string" required>
+  The ID of the subscription to pause
+</ParamField>
+
+<ParamField path="PauseEffectiveDate" type="*string">
+  The YYYY-MM-DD-formatted date when the scheduled PAUSE action takes place on the subscription. When this date is unspecified or falls within the current billing cycle, the subscription is paused on the starting date of the next billing cycle.
+</ParamField>
+
+<ParamField path="PauseCycleDuration" type="*int64">
+  The number of billing cycles the subscription will be paused before it is reactivated
+</ParamField>
+
+<ParamField path="ResumeEffectiveDate" type="*string">
+  The date when the subscription is reactivated by a scheduled RESUME action
+</ParamField>
+
+<ParamField path="ResumeChangeTiming" type="*square.ChangeTiming">
+  The timing whether the subscription is reactivated immediately or at the end of the billing cycle, relative to resume_effective_date
+</ParamField>
+
+<ParamField path="PauseReason" type="*string">
+  The user-provided reason to pause the subscription
+</ParamField>
+
+### Response
+
+<ResponseField name="Subscription" type="*square.Subscription">
+  The paused subscription
+</ResponseField>
+
+<ResponseField name="Actions" type="[]*square.SubscriptionAction">
+  The list of a PAUSE and/or RESUME actions created for the subscription
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>
+
+## Resume Subscription
+
+Resumes a paused subscription. The subscription is resumed at the beginning of the specified billing cycle.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.ResumeSubscriptionRequest{
+        SubscriptionID: "8151d94c-5c8e-4fd1-8e45-63716b49e7ab",
+        ResumeEffectiveDate: square.String("2023-08-01"),
+        ResumeChangeTiming: square.ChangeTimingImmediate.Ptr(),
+    }
+
+    response, err := client.Subscriptions.ResumeSubscription(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Subscription resumed: %s\n", *response.Subscription.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="SubscriptionID" type="string" required>
+  The ID of the subscription to resume
+</ParamField>
+
+<ParamField path="ResumeEffectiveDate" type="*string">
+  The YYYY-MM-DD-formatted date when the subscription reactivated
+</ParamField>
+
+<ParamField path="ResumeChangeTiming" type="*square.ChangeTiming">
+  The timing to resume a subscription, relative to the specified resume_effective_date attribute value
+</ParamField>
+
+### Response
+
+<ResponseField name="Subscription" type="*square.Subscription">
+  The resumed subscription
+</ResponseField>
+
+<ResponseField name="Actions" type="[]*square.SubscriptionAction">
+  The list of a RESUME action created for the subscription
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>
+
+## Swap Plan
+
+Changes the subscription plan for a subscription. The new plan takes effect at the next billing date.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.SwapPlanRequest{
+        SubscriptionID: "8151d94c-5c8e-4fd1-8e45-63716b49e7ab",
+        NewPlanVariationID: square.String("FQ7CNXXN2FZPK6FJF2QYMVZQ"),
+    }
+
+    response, err := client.Subscriptions.SwapPlan(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Plan swapped for subscription: %s\n", *response.Subscription.ID)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="SubscriptionID" type="string" required>
+  The ID of the subscription to swap the subscription plan for
+</ParamField>
+
+<ParamField path="NewPlanVariationID" type="*string" required>
+  The ID of the new subscription plan variation. This field is required.
+</ParamField>
+
+<ParamField path="Phases" type="[]*square.PhaseInput">
+  A list of PhaseInputs, to pass phase-specific information used in the swap
+</ParamField>
+
+### Response
+
+<ResponseField name="Subscription" type="*square.Subscription">
+  The subscription with the swapped plan
+</ResponseField>
+
+<ResponseField name="Actions" type="[]*square.SubscriptionAction">
+  The list of a SWAP_PLAN action created for the subscription
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>
+
+## Bulk Swap Plan
+
+Swaps the plan for multiple subscriptions. Active subscriptions using the old plan variation will be subscribed to the new plan variation on their next billing day.
+
+<CodeGroup>
+```go Example
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    request := &square.BulkSwapPlanRequest{
+        NewPlanVariationID: "FQ7CNXXN2FZPK6FJF2QYMVZQ",
+        OldPlanVariationID: "6JHXF3B2CW3YKHDV4XEM674H",
+        LocationID: "S8GWD5R9QB376",
+    }
+
+    response, err := client.Subscriptions.BulkSwapPlan(context.Background(), request)
+    if err != nil {
+        fmt.Printf("Error: %v\n", err)
+        return
+    }
+
+    fmt.Printf("Swapped plans for %d subscriptions\n", *response.AffectedSubscriptions)
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="NewPlanVariationID" type="string" required>
+  The ID of the new subscription plan variation. This field is required.
+</ParamField>
+
+<ParamField path="OldPlanVariationID" type="string" required>
+  The ID of the plan variation whose subscriptions should be swapped
+</ParamField>
+
+<ParamField path="LocationID" type="string" required>
+  The ID of the location to associate with the swapped subscriptions
+</ParamField>
+
+### Response
+
+<ResponseField name="AffectedSubscriptions" type="*int">
+  The number of affected subscriptions
+</ResponseField>
+
+<ResponseField name="Errors" type="[]*square.Error">
+  Errors encountered during the request
+</ResponseField>

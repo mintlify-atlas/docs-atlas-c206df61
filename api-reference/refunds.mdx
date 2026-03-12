@@ -1,0 +1,221 @@
+---
+title: "Refunds API"
+description: "Process payment refunds and retrieve refund details with the Square Go SDK"
+---
+
+The Refunds API allows you to refund payments, either in full or partially. You can refund card payments or record refunds for cash or external payments.
+
+## Client Methods
+
+### List Refunds
+
+Retrieves a list of refunds for the account making the request.
+
+```go
+client.Refunds.List(ctx context.Context, request *square.ListRefundsRequest) (*square.ListPaymentRefundsResponse, error)
+```
+
+<ParamField path="request" type="*square.ListRefundsRequest">
+  Request parameters for listing refunds
+  
+  <Expandable title="properties">
+    <ParamField path="BeginTime" type="*string">
+      Indicates the start of the time range to retrieve each PaymentRefund for, in RFC 3339 format. Default: The current time minus one year.
+    </ParamField>
+    
+    <ParamField path="EndTime" type="*string">
+      Indicates the end of the time range to retrieve each PaymentRefund for, in RFC 3339 format. Default: The current time.
+    </ParamField>
+    
+    <ParamField path="SortOrder" type="*string">
+      The order in which results are listed:
+      - `ASC` - Oldest to newest
+      - `DESC` - Newest to oldest (default)
+    </ParamField>
+    
+    <ParamField path="Cursor" type="*string">
+      A pagination cursor returned by a previous call to this endpoint.
+    </ParamField>
+    
+    <ParamField path="LocationID" type="*string">
+      Limit results to the location supplied. By default, results are returned for all locations.
+    </ParamField>
+    
+    <ParamField path="Status" type="*string">
+      If provided, only refunds with the given status are returned.
+    </ParamField>
+    
+    <ParamField path="SourceType" type="*string">
+      If provided, only returns refunds whose payments have the indicated source type. Current values include CARD, BANK_ACCOUNT, WALLET, CASH, and EXTERNAL.
+    </ParamField>
+    
+    <ParamField path="Limit" type="*int">
+      The maximum number of results to be returned in a single page. Default: 100 (also the maximum allowed value).
+    </ParamField>
+    
+    <ParamField path="SortField" type="*square.ListPaymentRefundsRequestSortField">
+      The field used to sort results by. The default is CREATED_AT.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.ListPaymentRefundsResponse">
+  The list of payment refunds
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.ListRefundsRequest{
+    BeginTime: square.String("2024-01-01T00:00:00Z"),
+    EndTime: square.String("2024-12-31T23:59:59Z"),
+    SortOrder: square.String("DESC"),
+    LocationID: square.String("location_id"),
+    Limit: square.Int(10),
+    SortField: square.ListPaymentRefundsRequestSortFieldCreatedAt.Ptr(),
+}
+
+response, err := client.Refunds.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+---
+
+### Refund Payment
+
+Refunds a payment. You can refund the entire payment amount or a portion of it. You can use this endpoint to refund a card payment or record a refund of a cash or external payment.
+
+```go
+client.Refunds.RefundPayment(ctx context.Context, request *square.RefundPaymentRequest) (*square.RefundPaymentResponse, error)
+```
+
+<ParamField path="request" type="*square.RefundPaymentRequest" required>
+  Request parameters for refunding a payment
+  
+  <Expandable title="properties">
+    <ParamField path="IdempotencyKey" type="string" required>
+      A unique string that identifies this RefundPayment request. Keys can be any valid string but must be unique for every RefundPayment request.
+    </ParamField>
+    
+    <ParamField path="AmountMoney" type="*square.Money" required>
+      The amount of money to refund. Cannot be more than the total_money value of the payment minus the total amount of all previously completed refunds.
+    </ParamField>
+    
+    <ParamField path="AppFeeMoney" type="*square.Money">
+      The amount of money the developer contributes to help cover the refunded amount. This is part of the application fee scenario.
+    </ParamField>
+    
+    <ParamField path="PaymentID" type="*string">
+      The unique ID of the payment being refunded. Required when unlinked=false.
+    </ParamField>
+    
+    <ParamField path="DestinationID" type="*string">
+      The ID indicating where funds will be refunded to. Required for unlinked refunds.
+    </ParamField>
+    
+    <ParamField path="Unlinked" type="*bool">
+      Indicates that the refund is not linked to a Square payment. If set to true, destination_id and location_id must be supplied.
+    </ParamField>
+    
+    <ParamField path="LocationID" type="*string">
+      The location ID associated with the unlinked refund. Required for requests specifying unlinked=true.
+    </ParamField>
+    
+    <ParamField path="CustomerID" type="*string">
+      The Customer ID of the customer associated with the refund. Required if destination_id refers to a card on file.
+    </ParamField>
+    
+    <ParamField path="Reason" type="*string">
+      A description of the reason for the refund.
+    </ParamField>
+    
+    <ParamField path="PaymentVersionToken" type="*string">
+      Used for optimistic concurrency. This opaque token identifies the current Payment version that the caller expects.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.RefundPaymentResponse">
+  The refund details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.RefundPaymentRequest{
+    IdempotencyKey: "9b7f2dcf-49da-4411-b23e-a2d6af21333a",
+    AmountMoney: &square.Money{
+        Amount: square.Int64(int64(1000)),
+        Currency: square.CurrencyUsd.Ptr(),
+    },
+    AppFeeMoney: &square.Money{
+        Amount: square.Int64(int64(10)),
+        Currency: square.CurrencyUsd.Ptr(),
+    },
+    PaymentID: square.String("R2B3Z8WMVt3EAmzYWLZvz7Y69EbZY"),
+    Reason: square.String("Customer requested refund"),
+}
+
+response, err := client.Refunds.RefundPayment(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+---
+
+### Get Refund
+
+Retrieves a specific refund using the refund_id.
+
+```go
+client.Refunds.Get(ctx context.Context, request *square.GetRefundsRequest) (*square.GetPaymentRefundResponse, error)
+```
+
+<ParamField path="RefundID" type="string" required>
+  The unique ID for the desired PaymentRefund.
+</ParamField>
+
+<ResponseField name="response" type="*square.GetPaymentRefundResponse">
+  The refund details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.GetRefundsRequest{
+    RefundID: "refund_id",
+}
+
+response, err := client.Refunds.Get(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+## Key Concepts
+
+### Refund Types
+
+- **Linked Refunds**: Refunds tied to a specific Square payment. The `payment_id` field is required.
+- **Unlinked Refunds**: Refunds not tied to a Square payment (e.g., cash refunds). Requires `unlinked=true`, `destination_id`, and `location_id`.
+
+### Partial Refunds
+
+You can refund a portion of a payment by specifying an `AmountMoney` less than the original payment amount. The refund amount cannot exceed the payment total minus any previously completed refunds.
+
+### Refund Status
+
+Refunds can have the following statuses:
+- `PENDING`: The refund is being processed
+- `COMPLETED`: The refund has been completed
+- `REJECTED`: The refund was rejected
+- `FAILED`: The refund failed
+
+## Learn More
+
+- [Square Refunds API Documentation](https://developer.squareup.com/docs/payments-api/refund-payments)
+- [Process Unlinked Refunds](https://developer.squareup.com/docs/refunds-api/unlinked-refunds)
+- [Cross-method Refunds to Gift Cards](https://developer.squareup.com/docs/payments-api/refund-payments#cross-method-refunds-to-gift-cards)

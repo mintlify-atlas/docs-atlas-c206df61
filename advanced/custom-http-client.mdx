@@ -1,0 +1,479 @@
+---
+title: Custom HTTP Client
+description: Provide your own HTTP client for advanced networking configurations
+---
+
+The Square Go SDK allows you to provide a custom HTTP client, giving you full control over networking behavior including timeouts, connection pooling, transport configuration, and instrumentation.
+
+## Why Use a Custom HTTP Client?
+
+Providing your own HTTP client is useful for:
+
+- Setting custom timeouts and connection limits
+- Adding request/response logging and monitoring
+- Configuring proxy settings
+- Implementing custom retry logic or circuit breakers
+- Adding distributed tracing headers
+- Using connection pooling optimized for your workload
+- Meeting specific security or compliance requirements
+
+<Warning>
+If you don't provide a custom HTTP client, the SDK uses `http.DefaultClient`, which waits indefinitely for responses. It's strongly recommended to provide a client with appropriate timeouts.
+</Warning>
+
+## Basic Usage
+
+Use `option.WithHTTPClient()` to provide a custom HTTP client when creating the Square client.
+
+### Simple Timeout Configuration
+
+The most common use case is setting a timeout:
+
+```go
+import (
+    "net/http"
+    "time"
+    
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(
+            &http.Client{
+                Timeout: 5 * time.Second,
+            },
+        ),
+    )
+    
+    // Use the client as normal
+}
+```
+
+### Advanced HTTP Configuration
+
+For production environments, you'll likely want more sophisticated configuration:
+
+```go
+import (
+    "crypto/tls"
+    "net"
+    "net/http"
+    "time"
+    
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    // Create a custom transport with optimized settings
+    transport := &http.Transport{
+        DialContext: (&net.Dialer{
+            Timeout:   10 * time.Second,
+            KeepAlive: 30 * time.Second,
+        }).DialContext,
+        MaxIdleConns:          100,
+        MaxIdleConnsPerHost:   10,
+        IdleConnTimeout:       90 * time.Second,
+        TLSHandshakeTimeout:   10 * time.Second,
+        ExpectContinueTimeout: 1 * time.Second,
+        // Enforce TLS 1.2 minimum
+        TLSClientConfig: &tls.Config{
+            MinVersion: tls.VersionTLS12,
+        },
+    }
+    
+    httpClient := &http.Client{
+        Transport: transport,
+        Timeout:   30 * time.Second,
+    }
+    
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(httpClient),
+    )
+    
+    // Use the client
+}
+```
+
+## Client-Level vs Request-Level Options
+
+You can provide the HTTP client at either the client level (affecting all requests) or at the request level (for individual API calls).
+
+### Client-Level Configuration
+
+Set once during client initialization:
+
+```go
+client := squareclient.NewClient(
+    option.WithToken("YOUR_ACCESS_TOKEN"),
+    option.WithHTTPClient(
+        &http.Client{
+            Timeout: 5 * time.Second,
+        },
+    ),
+)
+
+// All requests use this HTTP client
+response, err := client.Payments.List(ctx, request)
+```
+
+### Request-Level Configuration
+
+Override for specific requests:
+
+```go
+import (
+    "context"
+    "net/http"
+    "time"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+    )
+    
+    // Use a different HTTP client for this specific request
+    response, err := client.Payments.List(
+        context.TODO(),
+        &square.ListPaymentsRequest{
+            Total: square.Int64(100),
+        },
+        option.WithHTTPClient(
+            &http.Client{
+                Timeout: 10 * time.Second,
+            },
+        ),
+    )
+    
+    if err != nil {
+        // Handle error
+    }
+}
+```
+
+<Tip>
+Request-level options override client-level options, allowing you to use different configurations for different types of requests.
+</Tip>
+
+## Common Use Cases
+
+### Request/Response Logging
+
+Implement a custom `RoundTripper` to log all requests and responses:
+
+```go
+import (
+    "fmt"
+    "net/http"
+    "net/http/httputil"
+    "time"
+)
+
+type LoggingRoundTripper struct {
+    inner http.RoundTripper
+}
+
+func (l *LoggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+    // Log the request
+    reqDump, _ := httputil.DumpRequestOut(req, true)
+    fmt.Printf("Request:\n%s\n", reqDump)
+    
+    start := time.Now()
+    resp, err := l.inner.RoundTrip(req)
+    duration := time.Since(start)
+    
+    if err != nil {
+        fmt.Printf("Error: %v (took %v)\n", err, duration)
+        return nil, err
+    }
+    
+    // Log the response
+    respDump, _ := httputil.DumpResponse(resp, true)
+    fmt.Printf("Response (took %v):\n%s\n", duration, respDump)
+    
+    return resp, nil
+}
+
+// Usage
+func main() {
+    httpClient := &http.Client{
+        Transport: &LoggingRoundTripper{
+            inner: http.DefaultTransport,
+        },
+        Timeout: 30 * time.Second,
+    }
+    
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(httpClient),
+    )
+}
+```
+
+### Proxy Configuration
+
+Configure the client to use a proxy:
+
+```go
+import (
+    "net/http"
+    "net/url"
+    "time"
+)
+
+func main() {
+    proxyURL, _ := url.Parse("http://proxy.example.com:8080")
+    
+    transport := &http.Transport{
+        Proxy: http.ProxyURL(proxyURL),
+    }
+    
+    httpClient := &http.Client{
+        Transport: transport,
+        Timeout:   30 * time.Second,
+    }
+    
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(httpClient),
+    )
+}
+```
+
+### Distributed Tracing
+
+Add tracing headers to all requests:
+
+```go
+import (
+    "context"
+    "fmt"
+    "net/http"
+    "time"
+    
+    "github.com/google/uuid"
+)
+
+type TracingRoundTripper struct {
+    inner http.RoundTripper
+}
+
+func (t *TracingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+    // Add tracing headers
+    traceID := uuid.New().String()
+    req.Header.Set("X-Trace-ID", traceID)
+    req.Header.Set("X-Request-ID", uuid.New().String())
+    
+    fmt.Printf("Starting request with trace ID: %s\n", traceID)
+    
+    return t.inner.RoundTrip(req)
+}
+
+// Usage
+func main() {
+    httpClient := &http.Client{
+        Transport: &TracingRoundTripper{
+            inner: http.DefaultTransport,
+        },
+        Timeout: 30 * time.Second,
+    }
+    
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(httpClient),
+    )
+}
+```
+
+### Rate Limiting
+
+Implement client-side rate limiting:
+
+```go
+import (
+    "golang.org/x/time/rate"
+    "net/http"
+    "time"
+)
+
+type RateLimitedRoundTripper struct {
+    inner   http.RoundTripper
+    limiter *rate.Limiter
+}
+
+func (r *RateLimitedRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+    // Wait for rate limiter
+    if err := r.limiter.Wait(req.Context()); err != nil {
+        return nil, err
+    }
+    
+    return r.inner.RoundTrip(req)
+}
+
+// Usage: Limit to 10 requests per second
+func main() {
+    httpClient := &http.Client{
+        Transport: &RateLimitedRoundTripper{
+            inner:   http.DefaultTransport,
+            limiter: rate.NewLimiter(rate.Limit(10), 1),
+        },
+        Timeout: 30 * time.Second,
+    }
+    
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(httpClient),
+    )
+}
+```
+
+## HTTPClient Interface
+
+The SDK accepts any type that implements the `core.HTTPClient` interface:
+
+```go
+type HTTPClient interface {
+    Do(*http.Request) (*http.Response, error)
+}
+```
+
+The standard `*http.Client` type implements this interface, but you can also provide your own implementation for maximum flexibility:
+
+```go
+import (
+    "net/http"
+    
+    "github.com/square/square-go-sdk/core"
+)
+
+type MyCustomClient struct {
+    // Your custom fields
+}
+
+func (c *MyCustomClient) Do(req *http.Request) (*http.Response, error) {
+    // Your custom implementation
+    // ...
+    return &http.Response{}, nil
+}
+
+// Usage
+func main() {
+    myClient := &MyCustomClient{}
+    
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(myClient),
+    )
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Set Timeouts" icon="clock">
+    Never use `http.DefaultClient` in production. Always configure appropriate timeouts.
+  </Card>
+  <Card title="Reuse Clients" icon="recycle">
+    HTTP clients manage connection pools. Create them once and reuse them across requests.
+  </Card>
+  <Card title="Connection Pooling" icon="server">
+    Configure `MaxIdleConns` and `MaxIdleConnsPerHost` based on your expected request volume.
+  </Card>
+  <Card title="TLS Configuration" icon="lock">
+    Set minimum TLS version and other security settings appropriate for your requirements.
+  </Card>
+</CardGroup>
+
+### Recommended Production Settings
+
+For most production use cases, these settings provide a good starting point:
+
+```go
+transport := &http.Transport{
+    DialContext: (&net.Dialer{
+        Timeout:   10 * time.Second,  // Connection timeout
+        KeepAlive: 30 * time.Second,  // Keep-alive probes
+    }).DialContext,
+    MaxIdleConns:          100,              // Total idle connections
+    MaxIdleConnsPerHost:   10,               // Idle connections per host
+    IdleConnTimeout:       90 * time.Second, // How long idle connections stay open
+    TLSHandshakeTimeout:   10 * time.Second, // TLS handshake timeout
+    ExpectContinueTimeout: 1 * time.Second,  // 100-continue timeout
+}
+
+httpClient := &http.Client{
+    Transport: transport,
+    Timeout:   30 * time.Second, // Overall request timeout
+}
+```
+
+<Note>
+Adjust these values based on your specific requirements, network conditions, and Square API endpoint response times.
+</Note>
+
+## Context-Based Timeouts
+
+Remember that you can also use Go's `context` package for per-request timeouts, which work in conjunction with the HTTP client timeout:
+
+```go
+import (
+    "context"
+    "time"
+    
+    "github.com/square/square-go-sdk"
+)
+
+func main() {
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(
+            &http.Client{
+                Timeout: 30 * time.Second, // Overall client timeout
+            },
+        ),
+    )
+    
+    // Per-request timeout using context
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+    
+    response, err := client.Payments.List(
+        ctx,
+        &square.ListPaymentsRequest{
+            Total: square.Int64(100),
+        },
+    )
+    
+    if err != nil {
+        // Handle timeout or other error
+    }
+}
+```
+
+The effective timeout is whichever limit is reached first: the context timeout or the HTTP client timeout.
+
+## Related Topics
+
+<CardGroup cols={2}>
+  <Card title="Timeouts" icon="clock" href="/core-concepts/timeouts">
+    Learn more about timeout configuration and context usage
+  </Card>
+  <Card title="Request Options" icon="sliders" href="/core-concepts/request-options">
+    Explore all available request options
+  </Card>
+  <Card title="Retries" icon="rotate" href="/core-concepts/retries">
+    Understand the SDK's automatic retry behavior
+  </Card>
+  <Card title="Extra Properties" icon="puzzle-piece" href="/advanced/extra-properties">
+    Learn how to send and receive additional properties
+  </Card>
+</CardGroup>

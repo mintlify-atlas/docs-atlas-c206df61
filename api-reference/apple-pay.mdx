@@ -1,0 +1,172 @@
+---
+title: "Apple Pay API"
+description: "Register domains for Apple Pay on the Web with the Square Go SDK"
+---
+
+The Apple Pay API allows you to register domains for use with Apple Pay on the Web and Square. This is essential for platform developers who want to enable Apple Pay for their merchants.
+
+## Client Methods
+
+### Register Domain
+
+Activates a domain for use with Apple Pay on the Web and Square. A validation is performed on this domain by Apple to ensure that it is properly set up as an Apple Pay enabled domain.
+
+```go
+client.ApplePay.RegisterDomain(ctx context.Context, request *square.RegisterDomainRequest) (*square.RegisterDomainResponse, error)
+```
+
+<ParamField path="DomainName" type="string" required>
+  A domain name as described in RFC-1034 that will be registered with ApplePay.
+</ParamField>
+
+<ResponseField name="response" type="*square.RegisterDomainResponse">
+  Contains the registration status and any validation errors
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.RegisterDomainRequest{
+    DomainName: "example.com",
+}
+
+response, err := client.ApplePay.RegisterDomain(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Domain registration status: %s\n", response.Status)
+```
+</CodeGroup>
+
+## Domain Verification
+
+### Hosting the Verification File
+
+Before registering a domain, you must host Apple's domain verification file on your domain:
+
+1. Download the verification file from:
+   ```
+   https://app.squareup.com/digital-wallets/apple-pay/apple-developer-merchantid-domain-association
+   ```
+
+2. Host this file at:
+   ```
+   https://your-domain.com/.well-known/apple-developer-merchantid-domain-association
+   ```
+
+3. Ensure the file is accessible via HTTPS
+
+<Warning>
+The verification file is subject to change. We strongly recommend:
+- Checking for updates regularly
+- Avoiding long-lived caches
+- Implementing automated updates to stay in sync with the correct file version
+</Warning>
+
+### Verification Process
+
+When you call `RegisterDomain`:
+
+1. Square sends a registration request to Apple
+2. Apple validates that your domain is properly configured
+3. Apple checks for the presence and validity of the verification file
+4. If successful, your domain is activated for Apple Pay
+
+## Use Cases
+
+### Platform Developers
+
+This endpoint provides an easy way for platform developers to bulk activate Apple Pay on the Web with Square for merchants using their platform.
+
+```go Example: Bulk Registration
+domains := []string{
+    "merchant1.example.com",
+    "merchant2.example.com",
+    "merchant3.example.com",
+}
+
+for _, domain := range domains {
+    request := &square.RegisterDomainRequest{
+        DomainName: domain,
+    }
+    
+    response, err := client.ApplePay.RegisterDomain(context.TODO(), request)
+    if err != nil {
+        log.Printf("Failed to register %s: %v\n", domain, err)
+        continue
+    }
+    
+    fmt.Printf("Registered %s: %s\n", domain, response.Status)
+}
+```
+
+### E-commerce Applications
+
+Integrate Apple Pay into your web checkout flow:
+
+1. Register your domain using this API
+2. Implement the Square Web Payments SDK
+3. Initialize Apple Pay payment method
+4. Process payments using the Payments API
+
+## Error Handling
+
+Common errors when registering domains:
+
+### Domain Not Accessible
+
+Ensure your domain:
+- Is accessible via HTTPS
+- Has valid SSL certificates
+- Responds to requests within Apple's timeout period
+
+### Verification File Missing or Invalid
+
+Confirm that:
+- The verification file is at the correct path (`.well-known/...`)
+- The file content matches Apple's current version
+- The file is served with correct MIME type
+- No authentication is required to access the file
+
+### Domain Already Registered
+
+If a domain is already registered, the API will indicate this in the response. Re-registration is typically not necessary unless you're experiencing issues.
+
+## Security Considerations
+
+### HTTPS Required
+
+Apple Pay on the Web requires HTTPS. Ensure:
+- Valid SSL/TLS certificates are installed
+- Certificate chain is complete
+- No mixed content warnings
+
+### Domain Ownership
+
+Only register domains you own or have permission to use. Apple's validation process ensures you control the domain.
+
+## Integration with Web Payments SDK
+
+After registering your domain, integrate Apple Pay into your checkout:
+
+```javascript Web Payments SDK Example
+const payments = Square.payments(applicationId, locationId);
+const applePay = await payments.applePay({
+  version: 4,
+  // Apple Pay configuration
+});
+
+// Attach to button
+const applePayButton = document.getElementById('apple-pay-button');
+applePayButton.addEventListener('click', async () => {
+  const result = await applePay.tokenize();
+  // Send result.token to your backend to process payment
+});
+```
+
+## Learn More
+
+- [Take an Apple Pay Payment](https://developer.squareup.com/docs/web-payments/apple-pay)
+- [Apple Pay on the Web](https://developer.apple.com/apple-pay/)
+- [Square Web Payments SDK](https://developer.squareup.com/docs/web-payments/overview)
+- [Domain Verification](https://developer.squareup.com/docs/web-payments/apple-pay#step-1-register-your-web-domain)

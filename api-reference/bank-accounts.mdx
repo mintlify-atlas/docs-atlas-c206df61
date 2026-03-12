@@ -1,0 +1,306 @@
+---
+title: "Bank Accounts API"
+description: "Manage bank accounts on file for customers and merchants with the Square Go SDK"
+---
+
+The Bank Accounts API allows you to store, retrieve, and manage bank accounts linked to a Square account. Bank accounts enable ACH payments and direct bank transfers.
+
+## Client Methods
+
+### List Bank Accounts
+
+Returns a list of BankAccount objects linked to a Square account.
+
+```go
+client.BankAccounts.List(ctx context.Context, request *square.ListBankAccountsRequest) (*square.ListBankAccountsResponse, error)
+```
+
+<ParamField path="request" type="*square.ListBankAccountsRequest">
+  Request parameters for listing bank accounts
+  
+  <Expandable title="properties">
+    <ParamField path="Cursor" type="*string">
+      The pagination cursor returned by a previous call to this endpoint. Use it to retrieve the next set of results.
+    </ParamField>
+    
+    <ParamField path="Limit" type="*int">
+      Upper limit on the number of bank accounts to return in the response. Currently, 1000 is the largest supported limit (also the default).
+    </ParamField>
+    
+    <ParamField path="LocationID" type="*string">
+      Location ID. You can specify this optional filter to retrieve only the linked bank accounts belonging to a specific location.
+    </ParamField>
+    
+    <ParamField path="CustomerID" type="*string">
+      Customer ID. You can specify this optional filter to retrieve only the linked bank accounts belonging to a specific customer.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.ListBankAccountsResponse">
+  The list of bank accounts
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.ListBankAccountsRequest{
+    Limit: square.Int(50),
+    LocationID: square.String("location_id"),
+}
+
+response, err := client.BankAccounts.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Iterate through bank accounts
+for _, account := range response.BankAccounts {
+    fmt.Printf("Account ID: %s, Status: %s\n", account.ID, account.Status)
+}
+```
+</CodeGroup>
+
+---
+
+### Create Bank Account
+
+Store a bank account on file for a Square account.
+
+```go
+client.BankAccounts.CreateBankAccount(ctx context.Context, request *square.CreateBankAccountRequest) (*square.CreateBankAccountResponse, error)
+```
+
+<ParamField path="request" type="*square.CreateBankAccountRequest" required>
+  Request parameters for creating a bank account
+  
+  <Expandable title="properties">
+    <ParamField path="IdempotencyKey" type="string" required>
+      Unique ID for idempotency. See [Idempotency](https://developer.squareup.com/docs/working-with-apis/idempotency) for more information.
+    </ParamField>
+    
+    <ParamField path="SourceID" type="string" required>
+      The ID of the source that represents the bank account information to be stored. This field accepts the payment token created by WebSDK.
+    </ParamField>
+    
+    <ParamField path="CustomerID" type="*string">
+      The ID of the customer associated with the bank account to be stored.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.CreateBankAccountResponse">
+  The created bank account details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.CreateBankAccountRequest{
+    IdempotencyKey: "4e43559a-f0fd-47d3-9da2-7ea1f97d94be",
+    SourceID: "bnon:CA4SEHsQwr0rx6DbWLD5BQaqMnoYAQ",
+    CustomerID: square.String("HM3B2D5JKGZ69359BTEHXM2V8M"),
+}
+
+response, err := client.BankAccounts.CreateBankAccount(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Bank account created with ID: %s\n", response.BankAccount.ID)
+```
+</CodeGroup>
+
+---
+
+### Get Bank Account
+
+Retrieve details of a BankAccount linked to a Square account.
+
+```go
+client.BankAccounts.Get(ctx context.Context, request *square.GetBankAccountsRequest) (*square.GetBankAccountResponse, error)
+```
+
+<ParamField path="BankAccountID" type="string" required>
+  Square-issued ID of the desired BankAccount.
+</ParamField>
+
+<ResponseField name="response" type="*square.GetBankAccountResponse">
+  The bank account details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.GetBankAccountsRequest{
+    BankAccountID: "bank_account_id",
+}
+
+response, err := client.BankAccounts.Get(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+if response.BankAccount != nil {
+    fmt.Printf("Account Holder: %s\n", response.BankAccount.HolderName)
+    fmt.Printf("Account Type: %s\n", response.BankAccount.AccountType)
+    fmt.Printf("Status: %s\n", response.BankAccount.Status)
+}
+```
+</CodeGroup>
+
+---
+
+### Get Bank Account by V1 ID
+
+Returns details of a BankAccount identified by V1 bank account ID. This is useful for migrating from Connect V1 APIs.
+
+```go
+client.BankAccounts.GetByV1ID(ctx context.Context, request *square.GetByV1IDBankAccountsRequest) (*square.GetBankAccountByV1IDResponse, error)
+```
+
+<ParamField path="V1BankAccountID" type="string" required>
+  Connect V1 ID of the desired BankAccount.
+</ParamField>
+
+<ResponseField name="response" type="*square.GetBankAccountByV1IDResponse">
+  The bank account details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.GetByV1IDBankAccountsRequest{
+    V1BankAccountID: "v1_bank_account_id",
+}
+
+response, err := client.BankAccounts.GetByV1ID(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+---
+
+### Disable Bank Account
+
+Disable a bank account.
+
+```go
+client.BankAccounts.DisableBankAccount(ctx context.Context, request *square.DisableBankAccountsRequest) (*square.DisableBankAccountResponse, error)
+```
+
+<ParamField path="BankAccountID" type="string" required>
+  Square-issued ID of the BankAccount to disable.
+</ParamField>
+
+<ResponseField name="response" type="*square.DisableBankAccountResponse">
+  The disabled bank account details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.DisableBankAccountsRequest{
+    BankAccountID: "bank_account_id",
+}
+
+response, err := client.BankAccounts.DisableBankAccount(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Bank account disabled successfully")
+```
+</CodeGroup>
+
+## Key Concepts
+
+### Bank Account Tokens
+
+Bank account tokens (nonces) are single-use tokens generated by the Square Web Payments SDK that represent bank account details. You use a bank account token as the `SourceID` when creating a bank account on file.
+
+### ACH Payments
+
+Bank accounts on file enable ACH (Automated Clearing House) payments, which are electronic bank-to-bank transfers. ACH payments typically take 3-5 business days to settle.
+
+### Bank Account Verification
+
+Depending on your integration and requirements, bank accounts may need to be verified before they can be used for payments. Verification methods include:
+- Micro-deposit verification
+- Instant verification via bank login
+- Manual verification
+
+### Bank Account Status
+
+Bank accounts can have the following statuses:
+- `VERIFICATION_IN_PROGRESS`: The account is being verified
+- `VERIFIED`: The account is verified and ready to use
+- `DISABLED`: The account has been disabled
+
+## BankAccount Object Fields
+
+The BankAccount object includes:
+- `ID`: Unique identifier for the bank account
+- `AccountNumberSuffix`: Last few digits of the account number
+- `Country`: Country code for the account
+- `Currency`: Currency code for the account
+- `AccountType`: Type of account (CHECKING, SAVINGS, etc.)
+- `HolderName`: Name of the account holder
+- `PrimaryBankIdentificationNumber`: Routing number or equivalent
+- `Status`: Current status of the bank account
+- `Creditable`: Whether the account can receive credits
+- `Debitable`: Whether the account can be debited
+- `Fingerprint`: Unique identifier for the bank account across Square
+- `Version`: Version number for optimistic concurrency
+- `BankName`: Name of the financial institution
+
+## Use Cases
+
+### Customer Payments
+
+Store customer bank accounts for recurring payments or one-time ACH transactions:
+
+```go Example: Store Customer Bank Account
+request := &square.CreateBankAccountRequest{
+    IdempotencyKey: uuid.New().String(),
+    SourceID: bankAccountToken, // from Web Payments SDK
+    CustomerID: square.String(customerID),
+}
+
+response, err := client.BankAccounts.CreateBankAccount(context.TODO(), request)
+```
+
+### Merchant Payouts
+
+Merchants can link bank accounts to receive payouts from Square:
+
+```go Example: List Merchant Bank Accounts
+request := &square.ListBankAccountsRequest{
+    Limit: square.Int(10),
+}
+
+response, err := client.BankAccounts.List(context.TODO(), request)
+for _, account := range response.BankAccounts {
+    if account.Status == "VERIFIED" && *account.Creditable {
+        fmt.Printf("Ready for payouts: %s\n", account.ID)
+    }
+}
+```
+
+## Security Considerations
+
+### PCI Compliance
+
+Square handles PCI compliance for stored bank accounts. Bank account details are securely stored and tokenized. You never have access to the full account number after it's saved.
+
+### Data Protection
+
+Bank account information is sensitive. Always:
+- Use HTTPS for all API calls
+- Never log or store full account numbers
+- Implement proper access controls
+- Follow data retention policies
+
+## Learn More
+
+- [Square Bank Accounts API Documentation](https://developer.squareup.com/docs/bank-accounts-api)
+- [ACH Payments](https://developer.squareup.com/docs/payments-api/take-payments/ach-payments)
+- [Web Payments SDK - Bank Accounts](https://developer.squareup.com/docs/web-payments/ach)
+- [Retrieve a bank account by V1 ID](https://developer.squareup.com/docs/bank-accounts-api#retrieve-a-bank-account-by-using-an-id-issued-by-v1-bank-accounts-api)

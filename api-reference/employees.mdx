@@ -1,0 +1,165 @@
+---
+title: "Employees (Deprecated)"
+description: "Legacy API for managing employees - replaced by Team Members API"
+---
+
+<Warning>
+  The Employees API was deprecated at version 2020-08-26. Use the [Team Members API](/api-reference/team-members) instead.
+</Warning>
+
+The Employees API was the original API for managing employees in Square. It has been replaced by the more comprehensive Team Members API.
+
+## Overview
+
+The `client.Employees` client provides access to legacy employee operations:
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Use the Employees client (deprecated)
+response, err := client.Employees.List(context.Background(), &square.ListEmployeesRequest{})
+```
+
+## Migration Guide
+
+If you're currently using the Employees API, you should migrate to the Team Members API:
+
+| Employees API | Team Members API |
+|--------------|------------------|
+| `client.Employees.List()` | `client.TeamMembers.Search()` |
+| `client.Employees.Get()` | `client.TeamMembers.Get()` |
+| `Employee` object | `TeamMember` object |
+
+## Methods (Deprecated)
+
+### List
+
+Lists all employees for a location.
+
+```go
+request := &square.ListEmployeesRequest{
+    LocationID: square.String("location_id"),
+    Status: square.EmployeeStatusActive.Ptr(),
+    Limit: square.Int(100),
+    Cursor: square.String("cursor"),
+}
+
+response, err := client.Employees.List(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, employee := range response.Employees {
+    fmt.Printf("Employee: %s %s\n", *employee.FirstName, *employee.LastName)
+}
+```
+
+<ParamField path="locationID" type="*string">
+  Filter employees by location ID.
+</ParamField>
+
+<ParamField path="status" type="*square.EmployeeStatus">
+  Specifies the EmployeeStatus to filter the employee by. Possible values: `ACTIVE`, `INACTIVE`.
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  The number of employees to be returned on each page.
+</ParamField>
+
+<ParamField path="cursor" type="*string">
+  The token required to retrieve the specified page of results.
+</ParamField>
+
+<ResponseField name="employees" type="[]*square.Employee">
+  The list of employees.
+</ResponseField>
+
+<ResponseField name="cursor" type="*string">
+  The token to be used to retrieve the next page of results.
+</ResponseField>
+
+### Get
+
+Retrieves an employee by ID.
+
+```go
+request := &square.GetEmployeesRequest{
+    ID: "employee_id",
+}
+
+response, err := client.Employees.Get(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Employee: %s %s\n", *response.Employee.FirstName, *response.Employee.LastName)
+```
+
+<ParamField path="id" type="string" required>
+  UUID for the employee that was requested.
+</ParamField>
+
+<ResponseField name="employee" type="*square.Employee">
+  The requested employee.
+</ResponseField>
+
+## Employee Object (Deprecated)
+
+<ResponseField name="id" type="*string">
+  UUID for this object.
+</ResponseField>
+
+<ResponseField name="firstName" type="*string">
+  The employee's first name.
+</ResponseField>
+
+<ResponseField name="lastName" type="*string">
+  The employee's last name.
+</ResponseField>
+
+<ResponseField name="email" type="*string">
+  The employee's email address.
+</ResponseField>
+
+<ResponseField name="phoneNumber" type="*string">
+  The employee's phone number in E.164 format (e.g., "+12125554250").
+</ResponseField>
+
+<ResponseField name="locationIDs" type="[]string">
+  A list of location IDs where this employee has access to.
+</ResponseField>
+
+<ResponseField name="status" type="*square.EmployeeStatus">
+  Specifies the status of the employee. Possible values: `ACTIVE`, `INACTIVE`.
+</ResponseField>
+
+<ResponseField name="isOwner" type="*bool">
+  Whether this employee is the owner of the merchant. Each merchant has one owner employee with full authority over the account.
+</ResponseField>
+
+<ResponseField name="createdAt" type="*string">
+  A read-only timestamp in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="updatedAt" type="*string">
+  A read-only timestamp in RFC 3339 format.
+</ResponseField>
+
+## Why Migrate to Team Members?
+
+The Team Members API provides several advantages over the deprecated Employees API:
+
+- **More comprehensive data model**: Includes wage settings, job assignments, and location assignments
+- **Better search capabilities**: Search and filter team members by multiple criteria
+- **Bulk operations**: Create and update multiple team members at once
+- **Improved status tracking**: Better handling of active/inactive states
+- **Integration with other APIs**: Works seamlessly with the Labor API for shift management
+
+See the [Team Members API documentation](/api-reference/team-members) for complete migration details.

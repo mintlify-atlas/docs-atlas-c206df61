@@ -1,0 +1,273 @@
+---
+title: "V1 Transactions"
+description: "Legacy API for managing online store orders (deprecated)"
+---
+
+<Warning>
+  The V1 Transactions API is a legacy API that has been superseded by the Orders API. It is recommended to use the [Orders API](/api-reference/orders) for new integrations.
+</Warning>
+
+The V1 Transactions API provides methods for managing online store orders from the legacy Square Online Store. This API is maintained for backward compatibility with existing integrations.
+
+## Overview
+
+The V1 Transactions client provides methods for:
+- Listing online store orders
+- Retrieving individual order details
+- Updating order status (complete, cancel, refund)
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### V1ListOrders
+
+Provides summary information for a merchant's online store orders.
+
+```go v1transactions.go:470
+request := &square.V1ListOrdersRequest{
+    LocationID: "location_id",
+    Order: square.SortOrderDesc.Ptr(),
+    Limit: square.Int(100),
+    BatchToken: square.String("batch_token"),
+}
+response, err := client.V1Transactions.V1ListOrders(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="locationID" type="string" required>
+  The ID of the location to list online store orders for.
+</ParamField>
+
+<ParamField path="order" type="SortOrder">
+  The order in which payments are listed in the response.
+</ParamField>
+
+<ParamField path="limit" type="int">
+  The maximum number of payments to return in a single response. This value cannot exceed 200.
+</ParamField>
+
+<ParamField path="batchToken" type="string">
+  A pagination cursor to retrieve the next set of results for your original query to the endpoint.
+</ParamField>
+
+<ResponseField name="orders" type="[]V1Order">
+  The list of online store orders.
+</ResponseField>
+
+### V1RetrieveOrder
+
+Provides comprehensive information for a single online store order, including the order's history.
+
+```go v1transactions.go:559
+request := &square.V1RetrieveOrderRequest{
+    LocationID: "location_id",
+    OrderID: "order_id",
+}
+response, err := client.V1Transactions.V1RetrieveOrder(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="locationID" type="string" required>
+  The ID of the order's associated location.
+</ParamField>
+
+<ParamField path="orderID" type="string" required>
+  The order's Square-issued ID. You obtain this value from Order objects returned by the List Orders endpoint.
+</ParamField>
+
+<ResponseField name="order" type="V1Order">
+  The complete order details including history.
+</ResponseField>
+
+### V1UpdateOrder
+
+Updates the details of an online store order. Every update corresponds to one of three actions: complete, cancel, or refund.
+
+```go v1transactions.go:630
+request := &square.V1UpdateOrderRequest{
+    LocationID: "location_id",
+    OrderID: "order_id",
+    Action: square.V1UpdateOrderRequestActionComplete,
+    ShippedTrackingNumber: square.String("TRACK123456"),
+    CompletedNote: square.String("Order completed and shipped"),
+}
+response, err := client.V1Transactions.V1UpdateOrder(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="locationID" type="string" required>
+  The ID of the order's associated location.
+</ParamField>
+
+<ParamField path="orderID" type="string" required>
+  The order's Square-issued ID.
+</ParamField>
+
+<ParamField path="action" type="V1UpdateOrderRequestAction" required>
+  The action to perform on the order:
+  - `COMPLETE` - Mark the order as complete
+  - `CANCEL` - Cancel the order
+  - `REFUND` - Refund the order
+</ParamField>
+
+<ParamField path="shippedTrackingNumber" type="string">
+  The tracking number of the shipment associated with the order. Only valid if action is COMPLETE.
+</ParamField>
+
+<ParamField path="completedNote" type="string">
+  A merchant-specified note about the completion of the order. Only valid if action is COMPLETE.
+</ParamField>
+
+<ParamField path="refundedNote" type="string">
+  A merchant-specified note about the refunding of the order. Only valid if action is REFUND.
+</ParamField>
+
+<ParamField path="canceledNote" type="string">
+  A merchant-specified note about the canceling of the order. Only valid if action is CANCEL.
+</ParamField>
+
+<ResponseField name="order" type="V1Order">
+  The updated order.
+</ResponseField>
+
+## Use Cases
+
+### List Recent Orders
+
+Retrieve the most recent online store orders:
+
+```go
+request := &square.V1ListOrdersRequest{
+    LocationID: "L1234567890",
+    Order: square.SortOrderDesc.Ptr(),
+    Limit: square.Int(50),
+}
+
+response, err := client.V1Transactions.V1ListOrders(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, order := range response {
+    fmt.Printf("Order ID: %s, Total: %d\n", 
+        order.ID, order.TotalPrice.Amount)
+}
+```
+
+### Complete Order with Tracking
+
+Mark an order as complete and add tracking information:
+
+```go
+request := &square.V1UpdateOrderRequest{
+    LocationID: "L1234567890",
+    OrderID: "order_abc123",
+    Action: square.V1UpdateOrderRequestActionComplete,
+    ShippedTrackingNumber: square.String("1Z999AA10123456784"),
+    CompletedNote: square.String("Shipped via UPS Ground"),
+}
+
+response, err := client.V1Transactions.V1UpdateOrder(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Order completed: %s\n", *response.State)
+```
+
+### Cancel Order
+
+Cancel an order with a reason:
+
+```go
+request := &square.V1UpdateOrderRequest{
+    LocationID: "L1234567890",
+    OrderID: "order_abc123",
+    Action: square.V1UpdateOrderRequestActionCancel,
+    CanceledNote: square.String("Customer requested cancellation"),
+}
+
+response, err := client.V1Transactions.V1UpdateOrder(context.TODO(), request)
+```
+
+### Refund Order
+
+Process a refund for an order:
+
+```go
+request := &square.V1UpdateOrderRequest{
+    LocationID: "L1234567890",
+    OrderID: "order_abc123",
+    Action: square.V1UpdateOrderRequestActionRefund,
+    RefundedNote: square.String("Product arrived damaged"),
+}
+
+response, err := client.V1Transactions.V1UpdateOrder(context.TODO(), request)
+```
+
+## Migration to Orders API
+
+<Info>
+  For new integrations, use the [Orders API](/api-reference/orders) which provides more features and better functionality.
+</Info>
+
+The Orders API offers:
+- Support for multiple payment types
+- More flexible order states
+- Better support for modifiers and customizations
+- Integration with other Square services
+- Modern API design patterns
+
+### Migration Example
+
+V1 Transactions:
+```go
+// V1 API (deprecated)
+response, err := client.V1Transactions.V1ListOrders(ctx, request)
+```
+
+Orders API:
+```go
+// Orders API (recommended)
+response, err := client.Orders.SearchOrders(ctx, request)
+```
+
+## Limitations
+
+- Only works with legacy Square Online Store orders
+- Limited update actions (complete, cancel, refund)
+- No support for modern payment methods
+- Cannot create new orders through this API
+- Pagination uses batch tokens instead of cursors
+
+## Best Practices
+
+- **Migrate to Orders API**: Plan migration to the modern Orders API
+- **Use for legacy only**: Only use this API for existing integrations
+- **Handle pagination**: Implement proper pagination using batch tokens
+- **Add order notes**: Include descriptive notes when updating orders
+- **Track shipments**: Always include tracking numbers when completing orders
+
+## Related Resources
+
+- [Orders API](/api-reference/orders) (Recommended)
+- [Payments API](/api-reference/payments)
+- [Refunds API](/api-reference/refunds)

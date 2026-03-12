@@ -1,0 +1,513 @@
+---
+title: "Gift Cards"
+description: "Create, manage, and track gift cards with the Square Go SDK Gift Cards API client."
+---
+
+The Gift Cards API allows you to create digital gift cards, register physical gift cards, and manage gift card relationships with customers. Gift cards can be used across all of a seller's locations.
+
+## Client Initialization
+
+Access the Gift Cards client through the main Square client:
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Access the Gift Cards API
+giftCardsClient := client.GiftCards
+```
+
+## Core Methods
+
+### List
+
+Retrieve a paginated list of gift cards with optional filters.
+
+<CodeGroup>
+```go List All Gift Cards
+request := &square.ListGiftCardsRequest{
+    Limit: square.Int(50),
+    Cursor: square.String("cursor-from-previous-call"),
+}
+
+response, err := client.GiftCards.List(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, giftCard := range response.GiftCards {
+    fmt.Printf("Gift Card: %s, Balance: %d\n",
+        *giftCard.ID,
+        *giftCard.BalanceMoney.Amount)
+}
+```
+
+```go Filter by Customer
+request := &square.ListGiftCardsRequest{
+    CustomerID: square.String("CUSTOMER_ID"),
+    Limit: square.Int(30),
+}
+
+response, err := client.GiftCards.List(context.TODO(), request)
+```
+
+```go Filter by Type and State
+request := &square.ListGiftCardsRequest{
+    Type: square.String("DIGITAL"),
+    State: square.String("ACTIVE"),
+    Limit: square.Int(100),
+}
+
+response, err := client.GiftCards.List(context.TODO(), request)
+```
+</CodeGroup>
+
+<ParamField path="type" type="*string">
+  Filter by gift card type: `PHYSICAL` or `DIGITAL`.
+</ParamField>
+
+<ParamField path="state" type="*string">
+  Filter by gift card state: `ACTIVE`, `DEACTIVATED`, `BLOCKED`, or `PENDING`.
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  Maximum results per page (1-200, default 30).
+</ParamField>
+
+<ParamField path="cursor" type="*string">
+  Pagination cursor from a previous response.
+</ParamField>
+
+<ParamField path="customerID" type="*string">
+  Filter by linked customer ID.
+</ParamField>
+
+<ResponseField name="giftCards" type="[]*square.GiftCard">
+  Array of gift card objects.
+</ResponseField>
+
+<ResponseField name="cursor" type="*string">
+  Pagination cursor for the next page.
+</ResponseField>
+
+### Create
+
+Create a new digital gift card or register a physical gift card.
+
+<CodeGroup>
+```go Create Digital Gift Card
+request := &square.CreateGiftCardRequest{
+    IdempotencyKey: "unique-key-" + time.Now().String(),
+    LocationID: "LOCATION_ID",
+    GiftCard: &square.GiftCard{
+        Type: square.GiftCardTypeDigital,
+    },
+}
+
+response, err := client.GiftCards.Create(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Created gift card: %s\n", *response.GiftCard.ID)
+fmt.Printf("GAN: %s\n", *response.GiftCard.Gan)
+```
+
+```go Register Physical Gift Card
+request := &square.CreateGiftCardRequest{
+    IdempotencyKey: "physical-card-" + time.Now().String(),
+    LocationID: "LOCATION_ID",
+    GiftCard: &square.GiftCard{
+        Type: square.GiftCardTypePhysical,
+        Gan: square.String("7783320001001635"),
+    },
+}
+
+response, err := client.GiftCards.Create(context.TODO(), request)
+```
+
+```go Create with Custom GAN
+request := &square.CreateGiftCardRequest{
+    IdempotencyKey: "custom-gan-key",
+    LocationID: "LOCATION_ID",
+    GiftCard: &square.GiftCard{
+        Type: square.GiftCardTypeDigital,
+        GanSource: square.GiftCardGanSourceOther.Ptr(),
+        Gan: square.String("CUSTOMGAN12345678"),
+    },
+}
+
+response, err := client.GiftCards.Create(context.TODO(), request)
+```
+</CodeGroup>
+
+<ParamField path="idempotencyKey" type="string" required>
+  Unique key for idempotent operations.
+</ParamField>
+
+<ParamField path="locationID" type="string" required>
+  Location ID for reporting purposes. Gift cards work at all locations.
+</ParamField>
+
+<ParamField path="giftCard.type" type="square.GiftCardType" required>
+  Gift card type: `DIGITAL` or `PHYSICAL`.
+</ParamField>
+
+<ParamField path="giftCard.ganSource" type="*square.GiftCardGanSource">
+  GAN source: `SQUARE` (default) or `OTHER` for custom GANs.
+</ParamField>
+
+<ParamField path="giftCard.gan" type="*string">
+  Gift card account number (8-20 alphanumeric characters for custom GANs).
+</ParamField>
+
+<ResponseField name="giftCard" type="*square.GiftCard">
+  The newly created gift card object.
+</ResponseField>
+
+### Get
+
+Retrieve a gift card by its Square-issued ID.
+
+<CodeGroup>
+```go Get Gift Card by ID
+request := &square.GetGiftCardsRequest{
+    ID: "GIFT_CARD_ID",
+}
+
+response, err := client.GiftCards.Get(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Balance: $%.2f\n", 
+    float64(*response.GiftCard.BalanceMoney.Amount) / 100.0)
+```
+</CodeGroup>
+
+<ParamField path="id" type="string" required>
+  The Square-issued gift card ID.
+</ParamField>
+
+<ResponseField name="giftCard" type="*square.GiftCard">
+  The requested gift card object.
+</ResponseField>
+
+### GetFromGan
+
+Retrieve a gift card using its account number (GAN).
+
+<CodeGroup>
+```go Get Gift Card by GAN
+request := &square.GetGiftCardFromGanRequest{
+    Gan: "7783320001001635",
+}
+
+response, err := client.GiftCards.GetFromGan(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+```
+</CodeGroup>
+
+<ParamField path="gan" type="string" required>
+  The gift card account number (up to 255 digits for imported GANs, 16 for Square-issued).
+</ParamField>
+
+### GetFromNonce
+
+Retrieve a gift card using a secure payment token.
+
+<CodeGroup>
+```go Get Gift Card by Nonce
+request := &square.GetGiftCardFromNonceRequest{
+    Nonce: "cnon:7783322135245171",
+}
+
+response, err := client.GiftCards.GetFromNonce(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+```
+</CodeGroup>
+
+<ParamField path="nonce" type="string" required>
+  Payment token from Web Payments SDK or In-App Payments SDK.
+</ParamField>
+
+### LinkCustomer
+
+Link a customer to a gift card (add card on file).
+
+<CodeGroup>
+```go Link Customer to Gift Card
+request := &square.LinkCustomerToGiftCardRequest{
+    GiftCardID: "GIFT_CARD_ID",
+    CustomerID: "CUSTOMER_ID",
+}
+
+response, err := client.GiftCards.LinkCustomer(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Linked customers: %v\n", 
+    response.GiftCard.CustomerIDs)
+```
+</CodeGroup>
+
+<ParamField path="giftCardID" type="string" required>
+  The ID of the gift card to link.
+</ParamField>
+
+<ParamField path="customerID" type="string" required>
+  The ID of the customer to link.
+</ParamField>
+
+<ResponseField name="giftCard" type="*square.GiftCard">
+  The gift card with updated customer_ids field.
+</ResponseField>
+
+### UnlinkCustomer
+
+Unlink a customer from a gift card (remove card on file).
+
+<CodeGroup>
+```go Unlink Customer from Gift Card
+request := &square.UnlinkCustomerFromGiftCardRequest{
+    GiftCardID: "GIFT_CARD_ID",
+    CustomerID: "CUSTOMER_ID",
+}
+
+response, err := client.GiftCards.UnlinkCustomer(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+```
+</CodeGroup>
+
+<ParamField path="giftCardID" type="string" required>
+  The ID of the gift card.
+</ParamField>
+
+<ParamField path="customerID" type="string" required>
+  The ID of the customer to unlink.
+</ParamField>
+
+## Complete Example
+
+<CodeGroup>
+```go Gift Card Lifecycle
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    ctx := context.TODO()
+
+    // 1. Create a digital gift card
+    createReq := &square.CreateGiftCardRequest{
+        IdempotencyKey: fmt.Sprintf("gift-%d", time.Now().Unix()),
+        LocationID: "LOCATION_ID",
+        GiftCard: &square.GiftCard{
+            Type: square.GiftCardTypeDigital,
+        },
+    }
+
+    createResp, err := client.GiftCards.Create(ctx, createReq)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    giftCardID := *createResp.GiftCard.ID
+    fmt.Printf("Created gift card: %s\n", giftCardID)
+
+    // 2. Link to a customer
+    linkReq := &square.LinkCustomerToGiftCardRequest{
+        GiftCardID: giftCardID,
+        CustomerID: "CUSTOMER_ID",
+    }
+
+    linkResp, err := client.GiftCards.LinkCustomer(ctx, linkReq)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Linked to customers: %v\n", 
+        linkResp.GiftCard.CustomerIDs)
+
+    // 3. Retrieve gift card details
+    getReq := &square.GetGiftCardsRequest{
+        ID: giftCardID,
+    }
+
+    getResp, err := client.GiftCards.Get(ctx, getReq)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    gc := getResp.GiftCard
+    fmt.Printf("Gift Card Status:\n")
+    fmt.Printf("  GAN: %s\n", *gc.Gan)
+    fmt.Printf("  State: %s\n", *gc.State)
+    fmt.Printf("  Balance: $%.2f\n", 
+        float64(*gc.BalanceMoney.Amount) / 100.0)
+
+    // 4. List all gift cards for customer
+    listReq := &square.ListGiftCardsRequest{
+        CustomerID: square.String("CUSTOMER_ID"),
+    }
+
+    listResp, err := client.GiftCards.List(ctx, listReq)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    fmt.Printf("Customer has %d gift card(s)\n", 
+        len(listResp.GiftCards))
+}
+```
+</CodeGroup>
+
+## Types
+
+### GiftCard
+
+The main gift card object.
+
+```go
+type GiftCard struct {
+    ID           *string
+    Type         GiftCardType
+    GanSource    *GiftCardGanSource
+    State        *GiftCardStatus
+    BalanceMoney *Money
+    Gan          *string
+    CreatedAt    *string
+    CustomerIDs  []string
+}
+```
+
+### GiftCardType
+
+Gift card type enumeration.
+
+```go
+const (
+    GiftCardTypePhysical GiftCardType = "PHYSICAL"
+    GiftCardTypeDigital  GiftCardType = "DIGITAL"
+)
+```
+
+### GiftCardStatus
+
+Gift card state enumeration.
+
+```go
+const (
+    GiftCardStatusActive      GiftCardStatus = "ACTIVE"
+    GiftCardStatusDeactivated GiftCardStatus = "DEACTIVATED"
+    GiftCardStatusBlocked     GiftCardStatus = "BLOCKED"
+    GiftCardStatusPending     GiftCardStatus = "PENDING"
+)
+```
+
+### GiftCardGanSource
+
+GAN source enumeration.
+
+```go
+const (
+    GiftCardGanSourceSquare GiftCardGanSource = "SQUARE"
+    GiftCardGanSourceOther  GiftCardGanSource = "OTHER"
+)
+```
+
+## Gift Card States
+
+<Tabs>
+  <Tab title="PENDING">
+    Newly created gift card that hasn't been activated yet. Create a gift card activity to activate it.
+  </Tab>
+  
+  <Tab title="ACTIVE">
+    Gift card is active and can be used for purchases.
+  </Tab>
+  
+  <Tab title="DEACTIVATED">
+    Gift card has been deactivated and cannot be used.
+  </Tab>
+  
+  <Tab title="BLOCKED">
+    Gift card is temporarily blocked, typically due to suspected fraud.
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Activation Required">
+    Newly created gift cards have a `PENDING` state. You must create a gift card activity (ACTIVATE) or refund a payment to the card to activate it for use.
+  </Accordion>
+  
+  <Accordion title="Custom GAN Security">
+    When using custom GANs with `GiftCardGanSourceOther`, ensure they:
+    - Are 8-20 alphanumeric characters
+    - Don't start with major credit card BINs
+    - Aren't easily guessable (avoid 12345678)
+    - Are unique per seller
+  </Accordion>
+  
+  <Accordion title="Location Registration">
+    While gift cards are registered to a specific location for reporting, they can be redeemed at any of the seller's locations.
+  </Accordion>
+  
+  <Accordion title="Customer Linking">
+    Link gift cards to customers to enable features like viewing cards on file and tracking usage patterns.
+  </Accordion>
+  
+  <Accordion title="Balance Tracking">
+    The `balance_money` field is always >= 0. To load or adjust balances, use the Gift Card Activities API.
+  </Accordion>
+</AccordionGroup>
+
+## Use Cases
+
+<Card title="Digital Gift Cards" icon="mobile">
+  Create digital gift cards that customers can receive via email or text and redeem using their phone.
+</Card>
+
+<Card title="Physical Card Registration" icon="credit-card">
+  Register physical gift cards ordered from Square by providing the printed GAN.
+</Card>
+
+<Card title="Customer Loyalty Integration" icon="heart">
+  Link gift cards to customer profiles for seamless tracking and enhanced customer experience.
+</Card>
+
+<Card title="Balance Inquiry" icon="scale-balanced">
+  Allow customers to check their gift card balance using GetFromGan or GetFromNonce.
+</Card>
+
+## Related Resources
+
+- [Customers API](/api-reference/customers) - Link gift cards to customers
+- [Payments API](/api-reference/payments) - Process gift card payments
+- [Refunds API](/api-reference/refunds) - Handle gift card refunds

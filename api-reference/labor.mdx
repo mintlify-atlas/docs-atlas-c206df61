@@ -1,0 +1,352 @@
+---
+title: "Labor"
+description: "Manage scheduled shifts and timecards using the Labor API"
+---
+
+The Labor API provides methods to manage scheduled shifts and timecards (legacy) for your team members.
+
+## Overview
+
+The `client.Labor` client provides access to labor management operations:
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Use the Labor client
+response, err := client.Labor.SearchScheduledShifts(context.Background(), &square.SearchScheduledShiftsRequest{})
+```
+
+## Scheduled Shifts
+
+Scheduled shifts represent planned work shifts for team members. They contain draft and published shift details.
+
+### CreateScheduledShift
+
+Creates a scheduled shift by providing draft shift details such as job ID, team member assignment, and start and end times.
+
+```go
+request := &square.CreateScheduledShiftRequest{
+    IdempotencyKey: square.String("HIDSNG5KS478L"),
+    ScheduledShift: &square.ScheduledShift{
+        DraftShiftDetails: &square.ScheduledShiftDetails{
+            TeamMemberID: square.String("ormj0jJJZ5OZIzxrZYJI"),
+            LocationID: square.String("PAA1RJZZKXBFG"),
+            JobID: square.String("FzbJAtt9qEWncK1BWgVCxQ6M"),
+            StartAt: square.String("2019-01-25T03:11:00-05:00"),
+            EndAt: square.String("2019-01-25T13:11:00-05:00"),
+            Notes: square.String("Don't forget to prep the vegetables"),
+        },
+    },
+}
+
+response, err := client.Labor.CreateScheduledShift(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created shift: %s\n", *response.ScheduledShift.ID)
+```
+
+<ParamField path="idempotencyKey" type="*string">
+  A unique identifier for the request to ensure idempotency.
+</ParamField>
+
+<ParamField path="scheduledShift" type="*square.ScheduledShift" required>
+  The scheduled shift with `draft_shift_details`. The `start_at` and `end_at` timestamps must be provided in the time zone + offset of the shift location.
+</ParamField>
+
+### SearchScheduledShifts
+
+Returns a paginated list of scheduled shifts, with optional filter and sort settings.
+
+```go
+request := &square.SearchScheduledShiftsRequest{
+    Query: &square.ScheduledShiftQuery{
+        Filter: &square.ScheduledShiftFilter{
+            AssignmentStatus: square.ScheduledShiftFilterAssignmentStatusAssigned.Ptr(),
+        },
+        Sort: &square.ScheduledShiftSort{
+            Field: square.ScheduledShiftSortFieldCreatedAt.Ptr(),
+            Order: square.SortOrderAsc.Ptr(),
+        },
+    },
+    Limit: square.Int(50),
+}
+
+response, err := client.Labor.SearchScheduledShifts(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, shift := range response.ScheduledShifts {
+    fmt.Printf("Shift ID: %s\n", *shift.ID)
+}
+```
+
+<ParamField path="query" type="*square.ScheduledShiftQuery">
+  Query conditions used to filter and sort the results.
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  The maximum number of results to return in a single response page. The default value is 50.
+</ParamField>
+
+<ParamField path="cursor" type="*string">
+  The pagination cursor returned by the previous call to this endpoint.
+</ParamField>
+
+### RetrieveScheduledShift
+
+Retrieves a scheduled shift by ID.
+
+```go
+request := &square.RetrieveScheduledShiftRequest{
+    ID: "scheduled_shift_id",
+}
+
+response, err := client.Labor.RetrieveScheduledShift(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="id" type="string" required>
+  The ID of the scheduled shift to retrieve.
+</ParamField>
+
+### UpdateScheduledShift
+
+Updates the draft shift details for a scheduled shift. This endpoint supports sparse updates, so only new, changed, or removed fields are required in the request.
+
+```go
+request := &square.UpdateScheduledShiftRequest{
+    ID: "scheduled_shift_id",
+    ScheduledShift: &square.ScheduledShift{
+        DraftShiftDetails: &square.ScheduledShiftDetails{
+            StartAt: square.String("2019-03-25T03:11:00-05:00"),
+            EndAt: square.String("2019-03-25T13:18:00-05:00"),
+        },
+        Version: square.Int(1),
+    },
+}
+
+response, err := client.Labor.UpdateScheduledShift(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="id" type="string" required>
+  The ID of the scheduled shift to update.
+</ParamField>
+
+<ParamField path="scheduledShift" type="*square.ScheduledShift" required>
+  The scheduled shift with any updates in the `draft_shift_details` field. Include the `version` field for optimistic concurrency control.
+</ParamField>
+
+### PublishScheduledShift
+
+Publishes a scheduled shift. When published, Square copies the `draft_shift_details` to the `published_shift_details` field.
+
+```go
+request := &square.PublishScheduledShiftRequest{
+    ID: "scheduled_shift_id",
+    IdempotencyKey: "HIDSNG5KS478L",
+    Version: square.Int(2),
+    ScheduledShiftNotificationAudience: square.ScheduledShiftNotificationAudienceAll.Ptr(),
+}
+
+response, err := client.Labor.PublishScheduledShift(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="id" type="string" required>
+  The ID of the scheduled shift to publish.
+</ParamField>
+
+<ParamField path="idempotencyKey" type="string" required>
+  A unique identifier for the request to ensure idempotency.
+</ParamField>
+
+<ParamField path="version" type="*int">
+  The current version of the scheduled shift, used to enable optimistic concurrency control.
+</ParamField>
+
+<ParamField path="scheduledShiftNotificationAudience" type="*square.ScheduledShiftNotificationAudience">
+  Indicates whether Square should send email notifications to team members. Default value is `AFFECTED`.
+</ParamField>
+
+### BulkPublishScheduledShifts
+
+Publishes 1-100 scheduled shifts. The minimum `start_at` and maximum `end_at` timestamps must fall within a two-week period.
+
+```go
+request := &square.BulkPublishScheduledShiftsRequest{
+    ScheduledShifts: map[string]*square.BulkPublishScheduledShiftsData{
+        "shift_id_1": &square.BulkPublishScheduledShiftsData{
+            Version: square.Int(1),
+        },
+    },
+    ScheduledShiftNotificationAudience: square.ScheduledShiftNotificationAudienceAffected.Ptr(),
+}
+
+response, err := client.Labor.BulkPublishScheduledShifts(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="scheduledShifts" type="map[string]*square.BulkPublishScheduledShiftsData" required>
+  A map of 1 to 100 key-value pairs. Each key is the ID of a scheduled shift to publish.
+</ParamField>
+
+<ParamField path="scheduledShiftNotificationAudience" type="*square.ScheduledShiftNotificationAudience">
+  Indicates whether Square should send email notifications. Default is `AFFECTED`.
+</ParamField>
+
+## Timecards (Legacy)
+
+Timecards represent complete workdays for team members. This is a legacy feature.
+
+### CreateTimecard
+
+Creates a new `Timecard`. You must provide `location_id`, `team_member_id`, and `start_at`.
+
+```go
+request := &square.CreateTimecardRequest{
+    IdempotencyKey: square.String("HIDSNG5KS478L"),
+    Timecard: &square.Timecard{
+        LocationID: "PAA1RJZZKXBFG",
+        StartAt: "2019-01-25T03:11:00-05:00",
+        EndAt: square.String("2019-01-25T13:11:00-05:00"),
+        TeamMemberID: "ormj0jJJZ5OZIzxrZYJI",
+        Breaks: []*square.Break{
+            &square.Break{
+                StartAt: "2019-01-25T06:11:00-05:00",
+                EndAt: square.String("2019-01-25T06:16:00-05:00"),
+                BreakTypeID: "REGS1EQR1TPZ5",
+                Name: "Tea Break",
+                ExpectedDuration: "PT5M",
+                IsPaid: true,
+            },
+        },
+    },
+}
+
+response, err := client.Labor.CreateTimecard(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### SearchTimecards
+
+Returns a paginated list of `Timecard` records for a business. The list can be filtered by location IDs, team member IDs, timecard status, and dates.
+
+```go
+request := &square.SearchTimecardsRequest{
+    Query: &square.TimecardQuery{
+        Filter: &square.TimecardFilter{
+            Workday: &square.TimecardWorkday{
+                DateRange: &square.DateRange{
+                    StartDate: square.String("2019-01-20"),
+                    EndDate: square.String("2019-02-03"),
+                },
+                MatchTimecardsBy: square.TimecardWorkdayMatcherStartAt.Ptr(),
+                DefaultTimezone: square.String("America/Los_Angeles"),
+            },
+        },
+    },
+    Limit: square.Int(100),
+}
+
+response, err := client.Labor.SearchTimecards(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### RetrieveTimecard
+
+Returns a single `Timecard` specified by `id`.
+
+```go
+request := &square.RetrieveTimecardRequest{
+    ID: "timecard_id",
+}
+
+response, err := client.Labor.RetrieveTimecard(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### UpdateTimecard
+
+Updates an existing `Timecard`. When closing a `Timecard`, all `Break` instances must be complete with `end_at` set.
+
+```go
+request := &square.UpdateTimecardRequest{
+    ID: "timecard_id",
+    Timecard: &square.Timecard{
+        EndAt: square.String("2019-01-25T13:11:00-05:00"),
+        Status: square.TimecardStatusClosed.Ptr(),
+        Version: square.Int(1),
+    },
+}
+
+response, err := client.Labor.UpdateTimecard(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### DeleteTimecard
+
+Deletes a `Timecard`.
+
+```go
+request := &square.DeleteTimecardRequest{
+    ID: "timecard_id",
+}
+
+response, err := client.Labor.DeleteTimecard(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## ScheduledShift Object
+
+<ResponseField name="id" type="*string">
+  **Read only** The Square-issued ID of the scheduled shift.
+</ResponseField>
+
+<ResponseField name="draftShiftDetails" type="*square.ScheduledShiftDetails">
+  The latest draft shift details for the scheduled shift. This field is always present.
+</ResponseField>
+
+<ResponseField name="publishedShiftDetails" type="*square.ScheduledShiftDetails">
+  The current published shift details. This field is present only if the shift was published.
+</ResponseField>
+
+<ResponseField name="version" type="*int">
+  **Read only** The current version of the scheduled shift, incremented with each update.
+</ResponseField>
+
+<ResponseField name="createdAt" type="*string">
+  The timestamp when the scheduled shift was created, in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="updatedAt" type="*string">
+  The timestamp when the scheduled shift was last updated, in RFC 3339 format.
+</ResponseField>

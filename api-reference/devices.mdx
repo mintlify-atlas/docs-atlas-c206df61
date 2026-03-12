@@ -1,0 +1,333 @@
+---
+title: "Devices"
+description: "Manage Square Terminal and hardware devices with the Square Go SDK"
+---
+
+The Devices API allows you to retrieve and manage information about Square hardware devices, including Square Terminals and card readers.
+
+## Overview
+
+The `Devices` client provides methods to:
+- List all devices associated with a merchant
+- Retrieve details about a specific device
+- View device components (battery, WiFi, card reader, etc.)
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+    "github.com/square/square-go-sdk/v3/core"
+)
+
+client := square.NewClient(
+    &core.RequestOptions{
+        Token: "YOUR_ACCESS_TOKEN",
+    },
+)
+```
+
+## Methods
+
+### List Devices
+
+Retrieves a list of devices associated with the merchant. Currently, only Terminal API devices are supported.
+
+```go devices/client/client.go
+request := &square.ListDevicesRequest{
+    Cursor:     square.String("cursor_value"),
+    SortOrder:  square.SortOrderDesc.Ptr(),
+    Limit:      square.Int(10),
+    LocationID: square.String("LOCATION_ID"),
+}
+
+response, err := client.Devices.List(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, device := range response.Devices {
+    fmt.Printf("Device: %s (Type: %s)\n", *device.Attributes.Name, device.Attributes.Type)
+}
+```
+
+<ParamField path="cursor" type="*string">
+  A pagination cursor from a previous call. Provide this to retrieve the next set of results.
+</ParamField>
+
+<ParamField path="sort_order" type="*SortOrder">
+  The order in which results are listed:
+  - `ASC`: Oldest to newest
+  - `DESC`: Newest to oldest (default)
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  The number of results to return in a single page
+</ParamField>
+
+<ParamField path="location_id" type="*string">
+  If present, only returns devices at the target location
+</ParamField>
+
+<ResponseField name="devices" type="[]*Device">
+  Array of device objects
+  
+  <Expandable title="Device Object">
+    <ResponseField name="id" type="string">
+      A unique synthetic identifier for the device
+    </ResponseField>
+    
+    <ResponseField name="attributes" type="DeviceAttributes" required>
+      Device information including type, manufacturer, model, and version
+    </ResponseField>
+    
+    <ResponseField name="components" type="[]*Component">
+      List of device components (battery, WiFi, card reader, etc.)
+    </ResponseField>
+    
+    <ResponseField name="status" type="DeviceStatus">
+      The current status of the device
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Get Device
+
+Retrieves details about a specific device.
+
+```go devices/client/client.go
+request := &square.GetDevicesRequest{
+    DeviceID: "DEVICE_ID",
+}
+
+response, err := client.Devices.Get(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+device := response.Device
+fmt.Printf("Device Name: %s\n", *device.Attributes.Name)
+fmt.Printf("Manufacturer: %s\n", device.Attributes.Manufacturer)
+fmt.Printf("Model: %s\n", *device.Attributes.Model)
+
+// Check device status
+if device.Status != nil && device.Status.Category != nil {
+    fmt.Printf("Status: %s\n", *device.Status.Category)
+}
+
+// Inspect components
+for _, component := range device.Components {
+    fmt.Printf("Component Type: %s\n", component.Type)
+}
+```
+
+<ParamField path="deviceID" type="string" required>
+  The unique ID for the desired device
+</ParamField>
+
+<ResponseField name="device" type="Device">
+  The requested device object
+</ResponseField>
+
+## Response Types
+
+### Device
+
+Represents a Square hardware device.
+
+<ResponseField name="id" type="string">
+  A synthetic identifier for the device (generated from key device fields)
+</ResponseField>
+
+<ResponseField name="attributes" type="DeviceAttributes" required>
+  A collection of attributes representing the device
+</ResponseField>
+
+<ResponseField name="components" type="[]*Component">
+  List of components applicable to the device
+</ResponseField>
+
+<ResponseField name="status" type="DeviceStatus">
+  The current operational status of the device
+</ResponseField>
+
+### DeviceAttributes
+
+<ResponseField name="type" type="DeviceType" required>
+  The device type:
+  - `TERMINAL`: A Square Terminal device
+  - `HANDHELD`: A handheld device
+</ResponseField>
+
+<ResponseField name="manufacturer" type="string" required>
+  The maker of the device (e.g., "Square")
+</ResponseField>
+
+<ResponseField name="model" type="string">
+  The specific model of the device
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  A seller-specified name for the device
+</ResponseField>
+
+<ResponseField name="manufacturers_id" type="string">
+  The manufacturer-supplied identifier (often a serial number)
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  The RFC 3339 timestamp of the most recent update to device information
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  The current version of software installed on the device
+</ResponseField>
+
+### Component
+
+Represents a device component (battery, WiFi, card reader, etc.).
+
+<ResponseField name="type" type="ComponentType" required>
+  The type of component:
+  - `APPLICATION`: Software application
+  - `CARD_READER`: Card reader hardware
+  - `BATTERY`: Battery component
+  - `WIFI`: WiFi interface
+  - `ETHERNET`: Ethernet interface
+  - `PRINTER`: Printer component
+</ResponseField>
+
+<ResponseField name="application_details" type="ApplicationDetails">
+  Details for APPLICATION components
+</ResponseField>
+
+<ResponseField name="card_reader_details" type="CardReaderDetails">
+  Details for CARD_READER components
+</ResponseField>
+
+<ResponseField name="battery_details" type="BatteryDetails">
+  Details for BATTERY components
+  - `visible_percent`: Battery percentage
+  - `external_power`: Power connection status
+</ResponseField>
+
+<ResponseField name="wifi_details" type="WiFiDetails">
+  Details for WIFI components
+  - `active`: Whether WiFi is active
+  - `ssid`: Network name
+  - `ip_address_v4`: IPv4 address
+  - `signal_strength`: Signal strength measurement
+</ResponseField>
+
+<ResponseField name="ethernet_details" type="EthernetDetails">
+  Details for ETHERNET components
+  - `active`: Whether Ethernet is active
+  - `ip_address_v4`: IPv4 address
+</ResponseField>
+
+### DeviceStatus
+
+<ResponseField name="category" type="DeviceStatusCategory">
+  The status category:
+  - `AVAILABLE`: Device is available and operational
+  - `NEEDS_ATTENTION`: Device requires attention
+  - `OFFLINE`: Device is offline
+</ResponseField>
+
+## Use Cases
+
+### Check Device Battery Status
+
+```go
+response, err := client.Devices.Get(context.TODO(), &square.GetDevicesRequest{
+    DeviceID: "DEVICE_ID",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, component := range response.Device.Components {
+    if component.Type == square.ComponentComponentTypeBattery {
+        if component.BatteryDetails != nil {
+            fmt.Printf("Battery: %d%%\n", *component.BatteryDetails.VisiblePercent)
+            if component.BatteryDetails.ExternalPower != nil {
+                fmt.Printf("Power Status: %s\n", *component.BatteryDetails.ExternalPower)
+            }
+        }
+    }
+}
+```
+
+### List Devices at a Specific Location
+
+```go
+request := &square.ListDevicesRequest{
+    LocationID: square.String("LOCATION_ID"),
+    Limit:      square.Int(20),
+}
+
+response, err := client.Devices.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Found %d devices\n", len(response.Devices))
+for _, device := range response.Devices {
+    fmt.Printf("- %s (Model: %s)\n", 
+        *device.Attributes.Name,
+        *device.Attributes.Model,
+    )
+}
+```
+
+### Check Network Connectivity
+
+```go
+response, err := client.Devices.Get(context.TODO(), &square.GetDevicesRequest{
+    DeviceID: "DEVICE_ID",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, component := range response.Device.Components {
+    switch component.Type {
+    case square.ComponentComponentTypeWifi:
+        if component.WifiDetails != nil && component.WifiDetails.Active != nil {
+            if *component.WifiDetails.Active {
+                fmt.Printf("WiFi: Connected to %s\n", *component.WifiDetails.Ssid)
+                fmt.Printf("IP: %s\n", *component.WifiDetails.IPAddressV4)
+            }
+        }
+    case square.ComponentComponentTypeEthernet:
+        if component.EthernetDetails != nil && component.EthernetDetails.Active != nil {
+            if *component.EthernetDetails.Active {
+                fmt.Printf("Ethernet: Connected\n")
+                fmt.Printf("IP: %s\n", *component.EthernetDetails.IPAddressV4)
+            }
+        }
+    }
+}
+```
+
+## Error Handling
+
+```go
+response, err := client.Devices.Get(context.TODO(), request)
+if err != nil {
+    // Check for API errors
+    if response != nil && len(response.Errors) > 0 {
+        for _, e := range response.Errors {
+            fmt.Printf("Error: %s - %s\n", e.Category, e.Detail)
+        }
+    }
+    return err
+}
+```
+
+## Related Resources
+
+- [Devices API Documentation](https://developer.squareup.com/docs/devtools/devices)
+- [Terminal API](/api-reference/terminal) - Process payments on Square Terminal
+- [Locations API](/api-reference/locations) - Manage device locations

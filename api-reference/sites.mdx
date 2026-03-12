@@ -1,0 +1,240 @@
+---
+title: "Sites"
+description: "Manage Square Online sites with the Square Go SDK"
+---
+
+The Sites API allows you to retrieve information about Square Online sites. Square Online enables sellers to create and manage online stores.
+
+<Note>
+  Square Online APIs are publicly available as part of an early access program. For more information, see [Early access program for Square Online APIs](https://developer.squareup.com/docs/online-api#early-access-program-for-square-online-apis).
+</Note>
+
+## Overview
+
+The `Sites` client provides methods to:
+- List all Square Online sites for a seller
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+    "github.com/square/square-go-sdk/v3/core"
+)
+
+client := square.NewClient(
+    &core.RequestOptions{
+        Token: "YOUR_ACCESS_TOKEN",
+    },
+)
+```
+
+## Methods
+
+### List Sites
+
+Lists all Square Online sites that belong to a seller. Sites are listed in descending order by the `created_at` date.
+
+```go sites/client.go
+response, err := client.Sites.List(context.TODO())
+if err != nil {
+    // Handle error
+}
+
+for _, site := range response.Sites {
+    fmt.Printf("Site: %s\n", *site.SiteTitle)
+    fmt.Printf("Domain: %s\n", *site.Domain)
+    fmt.Printf("Published: %t\n", *site.IsPublished)
+    fmt.Printf("Created: %s\n", *site.CreatedAt)
+}
+```
+
+<ResponseField name="sites" type="[]*Site">
+  Array of site objects belonging to the seller
+  
+  <Expandable title="Site Object">
+    <ResponseField name="id" type="string">
+      The Square-assigned ID of the site
+    </ResponseField>
+    
+    <ResponseField name="site_title" type="string">
+      The title of the site
+    </ResponseField>
+    
+    <ResponseField name="domain" type="string">
+      The domain of the site without the protocol (e.g., "mysite1.square.site")
+    </ResponseField>
+    
+    <ResponseField name="is_published" type="bool">
+      Indicates whether the site is published
+    </ResponseField>
+    
+    <ResponseField name="created_at" type="string">
+      The timestamp when the site was created, in RFC 3339 format
+    </ResponseField>
+    
+    <ResponseField name="updated_at" type="string">
+      The timestamp when the site was last updated, in RFC 3339 format
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Response Types
+
+### Site
+
+Represents a Square Online site.
+
+<ResponseField name="id" type="string">
+  The Square-assigned ID of the site
+</ResponseField>
+
+<ResponseField name="site_title" type="string">
+  The title of the site (displayed in the browser title bar)
+</ResponseField>
+
+<ResponseField name="domain" type="string">
+  The domain of the site without the protocol. For example, `mysite1.square.site`
+</ResponseField>
+
+<ResponseField name="is_published" type="bool">
+  Indicates whether the site is currently published and accessible to customers
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  The timestamp when the site was created, in RFC 3339 format
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+  The timestamp when the site was last updated, in RFC 3339 format
+</ResponseField>
+
+## Use Cases
+
+### List All Published Sites
+
+```go
+response, err := client.Sites.List(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Published Sites:")
+for _, site := range response.Sites {
+    if *site.IsPublished {
+        fmt.Printf("- %s (https://%s)\n", *site.SiteTitle, *site.Domain)
+    }
+}
+```
+
+### Get Site IDs for Snippet Management
+
+```go
+// First, get all sites
+response, err := client.Sites.List(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+// Store site IDs for use with Snippets API
+var siteIDs []string
+for _, site := range response.Sites {
+    siteIDs = append(siteIDs, *site.ID)
+    fmt.Printf("Site ID: %s - %s\n", *site.ID, *site.SiteTitle)
+}
+
+// Now you can use these IDs with the Snippets API
+for _, siteID := range siteIDs {
+    snippetResponse, err := client.Snippets.Get(context.TODO(), &square.GetSnippetsRequest{
+        SiteID: siteID,
+    })
+    // Process snippets...
+}
+```
+
+### Check Site Status
+
+```go
+response, err := client.Sites.List(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, site := range response.Sites {
+    status := "Draft"
+    if *site.IsPublished {
+        status = "Published"
+    }
+    
+    fmt.Printf("%s: %s\n", *site.SiteTitle, status)
+    fmt.Printf("  Domain: %s\n", *site.Domain)
+    fmt.Printf("  Last Updated: %s\n", *site.UpdatedAt)
+}
+```
+
+## Error Handling
+
+```go
+response, err := client.Sites.List(context.TODO())
+if err != nil {
+    // Check for API errors
+    if response != nil && len(response.Errors) > 0 {
+        for _, e := range response.Errors {
+            fmt.Printf("Error: %s - %s\n", e.Category, e.Detail)
+        }
+    }
+    return err
+}
+```
+
+## Integration with Other APIs
+
+The Sites API works closely with the [Snippets API](/api-reference/snippets) to manage custom code injections on Square Online sites.
+
+```go
+// Step 1: Get all sites
+sitesResponse, err := client.Sites.List(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+// Step 2: Add a snippet to a specific site
+if len(sitesResponse.Sites) > 0 {
+    siteID := *sitesResponse.Sites[0].ID
+    
+    snippetRequest := &square.UpsertSnippetRequest{
+        SiteID: siteID,
+        Snippet: &square.Snippet{
+            Content: "<script>console.log('Hello from Square!');</script>",
+        },
+    }
+    
+    snippetResponse, err := client.Snippets.Upsert(context.TODO(), snippetRequest)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Println("Snippet added successfully!")
+}
+```
+
+## Important Notes
+
+<Warning>
+  The Sites API is part of an early access program and may be subject to changes.
+</Warning>
+
+<Tip>
+  Use the `is_published` field to filter sites that are currently live and accessible to customers.
+</Tip>
+
+<Info>
+  Sites are automatically sorted by `created_at` in descending order (newest first).
+</Info>
+
+## Related Resources
+
+- [Square Online APIs Documentation](https://developer.squareup.com/docs/online-api)
+- [Snippets API](/api-reference/snippets)
+- [Early Access Program Information](https://developer.squareup.com/docs/online-api#early-access-program-for-square-online-apis)

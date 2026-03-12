@@ -1,0 +1,350 @@
+---
+title: "Events"
+description: "Search and manage Square API events"
+---
+
+The Events API allows you to search for and retrieve historical events that have occurred in a Square account. This provides an audit trail and enables you to track changes over time.
+
+## Overview
+
+The Events client provides methods for:
+- Searching for events within a 28-day timeframe
+- Enabling and disabling event tracking
+- Listing available event types
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### SearchEvents
+
+Search for Square API events that occur within a 28-day timeframe.
+
+```go events.go:5654
+request := &square.SearchEventsRequest{
+    Query: &square.SearchEventsQuery{
+        Filter: &square.SearchEventsFilter{
+            EventTypes: []string{
+                "payment.created",
+                "payment.updated",
+            },
+            MerchantIDs: []string{
+                "merchant_id",
+            },
+            LocationIDs: []string{
+                "location_id",
+            },
+            CreatedAt: &square.TimeRange{
+                StartAt: square.String("2024-01-01T00:00:00Z"),
+                EndAt: square.String("2024-01-31T23:59:59Z"),
+            },
+        },
+        Sort: &square.SearchEventsSortField{
+            Field: square.SortFieldCreatedAt.Ptr(),
+            Order: square.SortOrderDesc.Ptr(),
+        },
+    },
+    Limit: square.Int(100),
+    Cursor: square.String("cursor"),
+}
+response, err := client.Events.SearchEvents(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="cursor" type="string">
+  A pagination cursor returned by a previous call to this endpoint. Provide this cursor to retrieve the next set of events.
+</ParamField>
+
+<ParamField path="limit" type="int">
+  The maximum number of events to return in a single page. The default value is 100, which is also the maximum allowed value.
+</ParamField>
+
+<ParamField path="query" type="SearchEventsQuery">
+  The filtering and sorting criteria for the search request.
+</ParamField>
+
+<ParamField path="query.filter.eventTypes" type="[]string">
+  Filter events by event type (e.g., "payment.created", "order.updated").
+</ParamField>
+
+<ParamField path="query.filter.merchantIDs" type="[]string">
+  Filter events by merchant ID.
+</ParamField>
+
+<ParamField path="query.filter.locationIDs" type="[]string">
+  Filter events by location ID.
+</ParamField>
+
+<ParamField path="query.filter.createdAt" type="TimeRange">
+  Filter events by creation time range (maximum 28 days).
+</ParamField>
+
+<ResponseField name="events" type="[]Event">
+  The list of events matching the search criteria.
+</ResponseField>
+
+<ResponseField name="cursor" type="string">
+  The pagination cursor for retrieving the next page of results.
+</ResponseField>
+
+### EnableEvents
+
+Enables events to make them searchable. Only events that occur while in the enabled state are searchable.
+
+```go events.go:5782
+response, err := client.Events.EnableEvents(
+    context.TODO(),
+)
+```
+
+<Info>
+  All events are disabled by default. You must enable events to make them searchable.
+</Info>
+
+<ResponseField name="status" type="string">
+  The current status of event tracking ("ENABLED" or "DISABLED").
+</ResponseField>
+
+### DisableEvents
+
+Disables events to prevent them from being searchable. Disabling events for a specific time period prevents them from being searchable, even if you re-enable them later.
+
+```go events.go:5740
+response, err := client.Events.DisableEvents(
+    context.TODO(),
+)
+```
+
+<Warning>
+  Disabling events for a specific time period prevents them from being searchable, even if you re-enable them later.
+</Warning>
+
+<ResponseField name="status" type="string">
+  The current status of event tracking ("ENABLED" or "DISABLED").
+</ResponseField>
+
+### ListEventTypes
+
+Lists all event types that you can subscribe to as webhooks or query using the Events API.
+
+```go events.go:5829
+request := &square.ListEventTypesRequest{
+    APIVersion: square.String("2021-12-15"),
+}
+response, err := client.Events.ListEventTypes(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="apiVersion" type="string">
+  The API version for which to list event types. Setting this field overrides the default version used by the application.
+</ParamField>
+
+<ResponseField name="eventTypes" type="[]string">
+  The list of available event types.
+</ResponseField>
+
+<ResponseField name="metadata" type="[]EventTypeMetadata">
+  Metadata about each event type including description and category.
+</ResponseField>
+
+## Use Cases
+
+### Track Payment History
+
+Search for all payment events within a date range:
+
+```go
+request := &square.SearchEventsRequest{
+    Query: &square.SearchEventsQuery{
+        Filter: &square.SearchEventsFilter{
+            EventTypes: []string{
+                "payment.created",
+                "payment.updated",
+            },
+            CreatedAt: &square.TimeRange{
+                StartAt: square.String("2024-03-01T00:00:00Z"),
+                EndAt: square.String("2024-03-12T23:59:59Z"),
+            },
+        },
+        Sort: &square.SearchEventsSortField{
+            Field: square.SortFieldCreatedAt.Ptr(),
+            Order: square.SortOrderDesc.Ptr(),
+        },
+    },
+    Limit: square.Int(100),
+}
+
+response, err := client.Events.SearchEvents(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, event := range response.Events {
+    fmt.Printf("Event: %s at %s\n", event.EventType, event.CreatedAt)
+}
+```
+
+### Audit Order Changes
+
+Retrieve all order-related events for a specific location:
+
+```go
+request := &square.SearchEventsRequest{
+    Query: &square.SearchEventsQuery{
+        Filter: &square.SearchEventsFilter{
+            EventTypes: []string{
+                "order.created",
+                "order.updated",
+                "order.fulfilled",
+            },
+            LocationIDs: []string{
+                "L1234567890",
+            },
+            CreatedAt: &square.TimeRange{
+                StartAt: square.String("2024-03-01T00:00:00Z"),
+                EndAt: square.String("2024-03-07T23:59:59Z"),
+            },
+        },
+    },
+    Limit: square.Int(100),
+}
+
+response, err := client.Events.SearchEvents(context.TODO(), request)
+```
+
+### Enable Event Tracking
+
+Enable event tracking for your Square account:
+
+```go
+response, err := client.Events.EnableEvents(context.TODO())
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Event tracking status: %s\n", response.Status)
+```
+
+### Paginate Through Results
+
+Handle large result sets using pagination:
+
+```go
+var allEvents []square.Event
+var cursor *string
+
+for {
+    request := &square.SearchEventsRequest{
+        Query: &square.SearchEventsQuery{
+            Filter: &square.SearchEventsFilter{
+                EventTypes: []string{"payment.created"},
+            },
+        },
+        Limit: square.Int(100),
+        Cursor: cursor,
+    }
+    
+    response, err := client.Events.SearchEvents(context.TODO(), request)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    allEvents = append(allEvents, response.Events...)
+    
+    if response.Cursor == nil || *response.Cursor == "" {
+        break
+    }
+    
+    cursor = response.Cursor
+}
+
+fmt.Printf("Total events: %d\n", len(allEvents))
+```
+
+## Common Event Types
+
+### Payment Events
+- `payment.created` - A payment was created
+- `payment.updated` - A payment was updated
+
+### Order Events
+- `order.created` - An order was created
+- `order.updated` - An order was updated
+- `order.fulfilled` - An order was fulfilled
+
+### Refund Events
+- `refund.created` - A refund was created
+- `refund.updated` - A refund was updated
+
+### Customer Events
+- `customer.created` - A customer was created
+- `customer.updated` - A customer was updated
+- `customer.deleted` - A customer was deleted
+
+### Inventory Events
+- `inventory.count.updated` - Inventory count changed
+
+### Booking Events
+- `booking.created` - A booking was created
+- `booking.updated` - A booking was updated
+
+## Best Practices
+
+- **Enable events before use**: Events must be enabled before they can be searched
+- **Stay within the 28-day window**: The Events API only retains events for 28 days
+- **Use specific filters**: Filter by event type and location to reduce result sets
+- **Implement pagination**: Handle large result sets with cursor-based pagination
+- **Monitor event volume**: Be aware of the number of events generated by your account
+- **Combine with Webhooks**: Use webhooks for real-time notifications and Events API for historical queries
+
+## Limitations
+
+<Warning>
+  The Events API has the following limitations:
+  - Events are retained for only 28 days
+  - You must enable events before they can be searched
+  - Events disabled during a time period cannot be searched later
+  - Maximum 100 events per page
+</Warning>
+
+## Error Handling
+
+```go
+response, err := client.Events.SearchEvents(context.TODO(), request)
+if err != nil {
+    if apiErr, ok := err.(*square.APIError); ok {
+        for _, e := range apiErr.Errors {
+            switch e.Code {
+            case "EVENTS_NOT_ENABLED":
+                // Enable events first
+                client.Events.EnableEvents(context.TODO())
+            case "INVALID_TIME_RANGE":
+                // Adjust time range to be within 28 days
+            default:
+                log.Printf("Error: %s - %s", e.Code, e.Detail)
+            }
+        }
+    }
+    return err
+}
+```
+
+## Related Resources
+
+- [Webhooks API](/api-reference/webhooks-api)
+- [Event-Driven Architecture Guide](https://developer.squareup.com/docs/events-api/overview)

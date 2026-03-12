@@ -1,0 +1,275 @@
+---
+title: "OAuth"
+description: "Authenticate and authorize access to Square APIs"
+---
+
+The OAuth API allows applications to obtain access tokens for Square merchant accounts using the OAuth 2.0 authorization framework. This enables secure, delegated access to Square resources.
+
+## Overview
+
+The OAuth client provides methods for:
+- Obtaining access tokens using authorization codes or refresh tokens
+- Revoking access tokens
+- Retrieving token status information
+- Authorizing applications
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### ObtainToken
+
+Returns an OAuth access token and refresh token using the `authorization_code` or `refresh_token` grant type.
+
+```go oauth.go:176
+request := &square.ObtainTokenRequest{
+    ClientID: "sq0idp-uaPHILoPzWZk3tlJqlML0g",
+    ClientSecret: square.String(
+        "sq0csp-30a-4C_tVOnTh14Piza2BfTPBXyLafLPWSzY1qAjeBfM",
+    ),
+    Code: square.String(
+        "sq0cgb-l0SBqxs4uwxErTVyYOdemg",
+    ),
+    GrantType: "authorization_code",
+}
+response, err := client.OAuth.ObtainToken(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="clientID" type="string" required>
+  The Square-issued ID of your application, available as the **Application ID** on the **OAuth** page in the Developer Console.
+</ParamField>
+
+<ParamField path="clientSecret" type="string">
+  The secret key for your application, available as the **Application secret** on the **OAuth** page. Required for the code flow for any grant type.
+</ParamField>
+
+<ParamField path="code" type="string">
+  The authorization code to exchange for an OAuth access token. Required for the code flow and PKCE flow if `grant_type` is `authorization_code`.
+</ParamField>
+
+<ParamField path="redirectURI" type="string">
+  The redirect URL for your application. Required for the code flow and PKCE flow if `grant_type` is `authorization_code` and you provided the `redirect_uri` parameter in your authorization URL.
+</ParamField>
+
+<ParamField path="grantType" type="string" required>
+  The method used to obtain an OAuth access token. Valid values:
+  - `authorization_code` - Requires the `code` field
+  - `refresh_token` - Requires the `refresh_token` field
+  - `migration_token` - LEGACY for access tokens obtained using a Square API version prior to 2019-03-13
+</ParamField>
+
+<ParamField path="refreshToken" type="string">
+  A valid refresh token for generating a new OAuth access token. Required for the code flow and PKCE flow if `grant_type` is `refresh_token`.
+</ParamField>
+
+<ParamField path="scopes" type="[]string">
+  The list of permissions that are explicitly requested for the access token. Optional for the code flow and PKCE flow if `grant_type` is `refresh_token`.
+</ParamField>
+
+<ParamField path="shortLived" type="bool">
+  Indicates whether the returned access token should expire in 24 hours. Optional. The default value is `false`.
+</ParamField>
+
+<ParamField path="codeVerifier" type="string">
+  The secret your application generated for the authorization request. Required for the PKCE flow if `grant_type` is `authorization_code`.
+</ParamField>
+
+<ResponseField name="accessToken" type="string">
+  The OAuth access token for accessing Square APIs.
+</ResponseField>
+
+<ResponseField name="tokenType" type="string">
+  The type of token returned (typically "bearer").
+</ResponseField>
+
+<ResponseField name="expiresAt" type="string">
+  The date when the access token expires, in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="refreshToken" type="string">
+  The refresh token for obtaining new access tokens.
+</ResponseField>
+
+### RevokeToken
+
+Revokes an access token generated with the OAuth flow. If an account has more than one OAuth access token for your application, this endpoint revokes all of them.
+
+```go oauth.go:51
+request := &square.RevokeTokenRequest{
+    ClientID: square.String("CLIENT_ID"),
+    AccessToken: square.String("ACCESS_TOKEN"),
+}
+response, err := client.OAuth.RevokeToken(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="clientID" type="string">
+  The Square-issued ID for your application, available on the **OAuth** page in the Developer Dashboard.
+</ParamField>
+
+<ParamField path="accessToken" type="string">
+  The access token of the merchant whose token you want to revoke. Do not provide a value for `merchant_id` if you provide this parameter.
+</ParamField>
+
+<ParamField path="merchantID" type="string">
+  The ID of the merchant whose token you want to revoke. Do not provide a value for `access_token` if you provide this parameter.
+</ParamField>
+
+<ParamField path="revokeOnlyAccessToken" type="bool">
+  If `true`, terminate the given single access token, but do not terminate the entire authorization. Default: `false`
+</ParamField>
+
+<ResponseField name="success" type="bool">
+  Indicates whether the revocation was successful.
+</ResponseField>
+
+### RetrieveTokenStatus
+
+Returns information about an OAuth access token or an application's personal access token.
+
+```go oauth.go:390
+response, err := client.OAuth.RetrieveTokenStatus(
+    context.TODO(),
+)
+```
+
+<Info>
+  Add the access token to the Authorization header of the request in the format: `Authorization: Bearer ACCESS_TOKEN`
+</Info>
+
+<ResponseField name="scopes" type="[]string">
+  The list of scopes associated with the token.
+</ResponseField>
+
+<ResponseField name="expiresAt" type="string">
+  The date when the access token expires, in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="clientID" type="string">
+  The Square application ID associated with the token.
+</ResponseField>
+
+<ResponseField name="merchantID" type="string">
+  The ID of the merchant associated with the token.
+</ResponseField>
+
+## OAuth Flows
+
+### Code Flow
+
+The standard OAuth 2.0 authorization code flow:
+
+1. **Redirect to Square's authorization page:**
+   ```
+   https://connect.squareup.com/oauth2/authorize?client_id=YOUR_CLIENT_ID&scope=MERCHANT_PROFILE_READ+PAYMENTS_WRITE&session=false
+   ```
+
+2. **Merchant authorizes your application**
+
+3. **Square redirects back with an authorization code**
+
+4. **Exchange code for access token:**
+   ```go
+   request := &square.ObtainTokenRequest{
+       ClientID: "YOUR_CLIENT_ID",
+       ClientSecret: square.String("YOUR_CLIENT_SECRET"),
+       Code: square.String("AUTHORIZATION_CODE"),
+       GrantType: "authorization_code",
+   }
+   
+   response, err := client.OAuth.ObtainToken(context.TODO(), request)
+   ```
+
+### Refresh Token Flow
+
+Refresh an expired access token:
+
+```go
+request := &square.ObtainTokenRequest{
+    ClientID: "YOUR_CLIENT_ID",
+    ClientSecret: square.String("YOUR_CLIENT_SECRET"),
+    RefreshToken: square.String("REFRESH_TOKEN"),
+    GrantType: "refresh_token",
+}
+
+response, err := client.OAuth.ObtainToken(context.TODO(), request)
+```
+
+### PKCE Flow
+
+Proof Key for Code Exchange (PKCE) for public clients:
+
+```go
+// After receiving the authorization code with PKCE
+request := &square.ObtainTokenRequest{
+    ClientID: "YOUR_CLIENT_ID",
+    Code: square.String("AUTHORIZATION_CODE"),
+    CodeVerifier: square.String("CODE_VERIFIER"),
+    GrantType: "authorization_code",
+}
+
+response, err := client.OAuth.ObtainToken(context.TODO(), request)
+```
+
+## Best Practices
+
+- **Store tokens securely**: OAuth tokens should be encrypted and stored on a secure server
+- **Never expose secrets**: Keep your client secret and access tokens out of client-side code
+- **Use refresh tokens**: Implement token refresh to maintain long-term access
+- **Respect scopes**: Only request the minimum scopes needed for your application
+- **Handle expiration**: Check token expiration and refresh proactively
+- **Use PKCE for public clients**: Mobile and single-page applications should use PKCE
+
+## Security Considerations
+
+<Warning>
+  **Important**: OAuth tokens should be encrypted and stored on a secure server. Application clients should never interact directly with OAuth tokens.
+</Warning>
+
+- Use HTTPS for all OAuth requests
+- Validate redirect URIs to prevent authorization code interception
+- Implement state parameters to prevent CSRF attacks
+- Rotate client secrets periodically
+- Monitor token usage for suspicious activity
+
+## Error Handling
+
+```go
+response, err := client.OAuth.ObtainToken(context.TODO(), request)
+if err != nil {
+    // Check for specific OAuth errors
+    if apiErr, ok := err.(*square.APIError); ok {
+        switch apiErr.Errors[0].Code {
+        case "INVALID_REQUEST":
+            // Handle invalid request
+        case "UNAUTHORIZED":
+            // Handle unauthorized access
+        case "ACCESS_TOKEN_EXPIRED":
+            // Refresh the token
+        }
+    }
+    return err
+}
+```
+
+## Related Resources
+
+- [OAuth Overview](https://developer.squareup.com/docs/oauth-api/overview)
+- [Authorization Scopes](https://developer.squareup.com/docs/oauth-api/what-it-does#oauth-permissions)
+- [Security Best Practices](https://developer.squareup.com/docs/build-basics/access-tokens)

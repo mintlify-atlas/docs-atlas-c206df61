@@ -1,0 +1,363 @@
+---
+title: "Loyalty"
+description: "Manage loyalty events and track customer engagement with the Square Go SDK Loyalty API client."
+---
+
+The Loyalty API allows you to search and track loyalty events in a Square loyalty program. Each change in a buyer's loyalty account point balance is recorded as an event that you can query and analyze.
+
+## Client Initialization
+
+Access the Loyalty client through the main Square client:
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Access the Loyalty API
+loyaltyClient := client.Loyalty
+```
+
+## Core Methods
+
+### SearchEvents
+
+Search for loyalty events using various filters. Events are sorted by `created_at` in descending order.
+
+<CodeGroup>
+```go Search by Order
+request := &square.SearchLoyaltyEventsRequest{
+    Query: &square.LoyaltyEventQuery{
+        Filter: &square.LoyaltyEventFilter{
+            OrderFilter: &square.LoyaltyEventOrderFilter{
+                OrderID: "PyATxhYLfsMqpVkcKJITPydgEYfZY",
+            },
+        },
+    },
+    Limit: square.Int(30),
+}
+
+response, err := client.Loyalty.SearchEvents(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, event := range response.Events {
+    fmt.Printf("Event: %s, Type: %s\n", 
+        *event.ID, 
+        event.Type)
+}
+```
+
+```go Search by Loyalty Account
+request := &square.SearchLoyaltyEventsRequest{
+    Query: &square.LoyaltyEventQuery{
+        Filter: &square.LoyaltyEventFilter{
+            LoyaltyAccountFilter: &square.LoyaltyEventLoyaltyAccountFilter{
+                LoyaltyAccountID: "LOYALTY_ACCOUNT_ID",
+            },
+        },
+    },
+    Limit: square.Int(50),
+}
+
+response, err := client.Loyalty.SearchEvents(context.TODO(), request)
+```
+
+```go Search by Location
+request := &square.SearchLoyaltyEventsRequest{
+    Query: &square.LoyaltyEventQuery{
+        Filter: &square.LoyaltyEventFilter{
+            LocationFilter: &square.LoyaltyEventLocationFilter{
+                LocationIDs: []string{
+                    "LOCATION_ID_1",
+                    "LOCATION_ID_2",
+                },
+            },
+        },
+    },
+}
+
+response, err := client.Loyalty.SearchEvents(context.TODO(), request)
+```
+
+```go Search by Date Range
+request := &square.SearchLoyaltyEventsRequest{
+    Query: &square.LoyaltyEventQuery{
+        Filter: &square.LoyaltyEventFilter{
+            DateTimeFilter: &square.LoyaltyEventDateTimeFilter{
+                CreatedAt: &square.TimeRange{
+                    StartAt: square.String("2024-01-01T00:00:00Z"),
+                    EndAt: square.String("2024-12-31T23:59:59Z"),
+                },
+            },
+        },
+    },
+}
+
+response, err := client.Loyalty.SearchEvents(context.TODO(), request)
+```
+
+```go Search by Event Type
+request := &square.SearchLoyaltyEventsRequest{
+    Query: &square.LoyaltyEventQuery{
+        Filter: &square.LoyaltyEventFilter{
+            TypeFilter: &square.LoyaltyEventTypeFilter{
+                Types: []square.LoyaltyEventType{
+                    square.LoyaltyEventTypeAccumulatePoints,
+                    square.LoyaltyEventTypeRedeemReward,
+                },
+            },
+        },
+    },
+    Limit: square.Int(25),
+    Cursor: square.String("pagination-cursor"),
+}
+
+response, err := client.Loyalty.SearchEvents(context.TODO(), request)
+```
+</CodeGroup>
+
+<ParamField path="query" type="*square.LoyaltyEventQuery">
+  Query object containing filter and sort criteria.
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  Maximum number of events to return per page. Default is 30.
+</ParamField>
+
+<ParamField path="cursor" type="*string">
+  Pagination cursor from a previous call to retrieve the next set of results.
+</ParamField>
+
+<ResponseField name="events" type="[]*square.LoyaltyEvent">
+  Array of loyalty events matching the search criteria.
+</ResponseField>
+
+<ResponseField name="cursor" type="*string">
+  Pagination cursor for the next page of results (if available).
+</ResponseField>
+
+<ResponseField name="errors" type="[]*square.Error">
+  Any errors that occurred during the request.
+</ResponseField>
+
+## Query Filters
+
+### LoyaltyEventFilter
+
+The main filter object supports multiple filter types that are combined with logical AND.
+
+<ParamField path="loyaltyAccountFilter" type="*square.LoyaltyEventLoyaltyAccountFilter">
+  Filter events by loyalty account ID.
+</ParamField>
+
+<ParamField path="typeFilter" type="*square.LoyaltyEventTypeFilter">
+  Filter by event types (combined with logical OR).
+</ParamField>
+
+<ParamField path="dateTimeFilter" type="*square.LoyaltyEventDateTimeFilter">
+  Filter by creation date range (start is inclusive, end is exclusive).
+</ParamField>
+
+<ParamField path="locationFilter" type="*square.LoyaltyEventLocationFilter">
+  Filter by location IDs (combined with logical OR).
+</ParamField>
+
+<ParamField path="orderFilter" type="*square.LoyaltyEventOrderFilter">
+  Filter by order ID.
+</ParamField>
+
+## Event Types
+
+Loyalty events track different types of point balance changes:
+
+<Tabs>
+  <Tab title="Point Changes">
+    - `ACCUMULATE_POINTS` - Points earned from a purchase
+    - `EXPIRE_POINTS` - Points expired due to time limit
+    - `ADJUST_POINTS` - Manual point adjustment by merchant
+    - `REDEEM_REWARD` - Points redeemed for a reward
+  </Tab>
+  
+  <Tab title="Account Management">
+    - `CREATE_REWARD` - Reward created for redemption
+    - `DELETE_REWARD` - Reward deleted before redemption
+    - `ACCUMULATE_PROMOTION_POINTS` - Bonus points from promotion
+  </Tab>
+  
+  <Tab title="Other Events">
+    - `OTHER` - Custom or unknown event types
+  </Tab>
+</Tabs>
+
+## Complete Example
+
+<CodeGroup>
+```go Track Customer Loyalty Activity
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/square/square-go-sdk/v3"
+)
+
+func main() {
+    client := square.NewClient(
+        square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+    )
+
+    // Search for all events for a specific loyalty account
+    // in the last 30 days
+    thirtyDaysAgo := time.Now().AddDate(0, 0, -30)
+    
+    request := &square.SearchLoyaltyEventsRequest{
+        Query: &square.LoyaltyEventQuery{
+            Filter: &square.LoyaltyEventFilter{
+                LoyaltyAccountFilter: &square.LoyaltyEventLoyaltyAccountFilter{
+                    LoyaltyAccountID: "LOYALTY_ACCOUNT_ID",
+                },
+                DateTimeFilter: &square.LoyaltyEventDateTimeFilter{
+                    CreatedAt: &square.TimeRange{
+                        StartAt: square.String(
+                            thirtyDaysAgo.Format(time.RFC3339),
+                        ),
+                    },
+                },
+            },
+        },
+        Limit: square.Int(100),
+    }
+
+    response, err := client.Loyalty.SearchEvents(
+        context.TODO(), 
+        request,
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Process events
+    totalPointsEarned := 0
+    totalPointsRedeemed := 0
+    
+    for _, event := range response.Events {
+        switch event.Type {
+        case square.LoyaltyEventTypeAccumulatePoints:
+            if event.AccumulatePoints != nil {
+                totalPointsEarned += *event.AccumulatePoints.Points
+            }
+        case square.LoyaltyEventTypeRedeemReward:
+            if event.RedeemReward != nil {
+                totalPointsRedeemed += *event.RedeemReward.Points
+            }
+        }
+    }
+
+    fmt.Printf("Points earned: %d\n", totalPointsEarned)
+    fmt.Printf("Points redeemed: %d\n", totalPointsRedeemed)
+    fmt.Printf("Net points: %d\n", 
+        totalPointsEarned - totalPointsRedeemed)
+}
+```
+</CodeGroup>
+
+## Types
+
+### LoyaltyEvent
+
+Represents a single loyalty event.
+
+```go
+type LoyaltyEvent struct {
+    ID                    *string
+    Type                  LoyaltyEventType
+    CreatedAt             *string
+    AccumulatePoints      *LoyaltyEventAccumulatePoints
+    CreateReward          *LoyaltyEventCreateReward
+    RedeemReward          *LoyaltyEventRedeemReward
+    DeleteReward          *LoyaltyEventDeleteReward
+    AdjustPoints          *LoyaltyEventAdjustPoints
+    LoyaltyAccountID      string
+    LocationID            *string
+    Source                LoyaltyEventSource
+    ExpirePoints          *LoyaltyEventExpirePoints
+    OtherEvent            *LoyaltyEventOther
+    AccumulatePromotionPoints *LoyaltyEventAccumulatePromotionPoints
+}
+```
+
+### LoyaltyEventQuery
+
+Query structure for searching events.
+
+```go
+type LoyaltyEventQuery struct {
+    Filter *LoyaltyEventFilter
+}
+
+type LoyaltyEventFilter struct {
+    LoyaltyAccountFilter *LoyaltyEventLoyaltyAccountFilter
+    TypeFilter           *LoyaltyEventTypeFilter
+    DateTimeFilter       *LoyaltyEventDateTimeFilter
+    LocationFilter       *LoyaltyEventLocationFilter
+    OrderFilter          *LoyaltyEventOrderFilter
+}
+```
+
+## Use Cases
+
+<AccordionGroup>
+  <Accordion title="Customer Activity Dashboard">
+    Search loyalty events by account to display a customer's complete loyalty history, including points earned, redeemed, and expired.
+  </Accordion>
+  
+  <Accordion title="Location Performance">
+    Filter events by location to analyze which stores generate the most loyalty activity and engagement.
+  </Accordion>
+  
+  <Accordion title="Promotion Tracking">
+    Use type filters to track promotion-specific point accumulation and measure campaign effectiveness.
+  </Accordion>
+  
+  <Accordion title="Order Attribution">
+    Filter by order ID to see all loyalty events associated with a specific purchase.
+  </Accordion>
+  
+  <Accordion title="Time-Based Analysis">
+    Use date filters to generate reports on loyalty activity over specific time periods.
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Card title="Combine Multiple Filters" icon="filter">
+  Use multiple filters together (e.g., location + date range + event type) to create precise queries and reduce result set size.
+</Card>
+
+<Card title="Pagination" icon="arrows-rotate">
+  Always handle pagination using the cursor field for large result sets to ensure you retrieve all matching events.
+</Card>
+
+<Card title="Event Timestamps" icon="clock">
+  Events are sorted by `created_at` in descending order (newest first). Use this for chronological analysis.
+</Card>
+
+<Card title="Logical Operators" icon="brackets-curly">
+  Remember: Multiple filters use AND logic, but arrays within filters (like location IDs) use OR logic.
+</Card>
+
+## Related Resources
+
+- [Customers API](/api-reference/customers) - Manage customer information
+- [Orders API](/api-reference/orders) - Track orders to earn loyalty points
+- [Payments API](/api-reference/payments) - Process payments with loyalty redemption

@@ -1,0 +1,372 @@
+---
+title: "Disputes API"
+description: "Manage payment disputes and chargebacks with the Square Go SDK"
+---
+
+The Disputes API allows you to retrieve, accept, and submit evidence for payment disputes (chargebacks). Use this API to manage the dispute resolution process programmatically.
+
+## Client Methods
+
+### List Disputes
+
+Returns a list of disputes associated with a particular account.
+
+```go
+client.Disputes.List(ctx context.Context, request *square.ListDisputesRequest) (*square.ListDisputesResponse, error)
+```
+
+<ParamField path="request" type="*square.ListDisputesRequest">
+  Request parameters for listing disputes
+  
+  <Expandable title="properties">
+    <ParamField path="Cursor" type="*string">
+      A pagination cursor returned by a previous call to this endpoint. Provide this cursor to retrieve the next set of results.
+    </ParamField>
+    
+    <ParamField path="States" type="*square.DisputeState">
+      The dispute states used to filter the result. If not specified, the endpoint returns all disputes.
+    </ParamField>
+    
+    <ParamField path="LocationID" type="*string">
+      The ID of the location for which to return a list of disputes. If not specified, the endpoint returns disputes associated with all locations.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.ListDisputesResponse">
+  The list of disputes
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.ListDisputesRequest{
+    States: square.DisputeStateInquiryEvidenceRequired.Ptr(),
+    LocationID: square.String("location_id"),
+}
+
+response, err := client.Disputes.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Iterate through disputes
+for _, dispute := range response.Disputes {
+    fmt.Printf("Dispute ID: %s, State: %s, Amount: %d\n",
+        dispute.ID,
+        dispute.State,
+        *dispute.AmountMoney.Amount,
+    )
+}
+```
+</CodeGroup>
+
+---
+
+### Get Dispute
+
+Returns details about a specific dispute.
+
+```go
+client.Disputes.Get(ctx context.Context, request *square.GetDisputesRequest) (*square.GetDisputeResponse, error)
+```
+
+<ParamField path="DisputeID" type="string" required>
+  The ID of the dispute you want more details about.
+</ParamField>
+
+<ResponseField name="response" type="*square.GetDisputeResponse">
+  The dispute details including reason, state, evidence, and deadlines
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.GetDisputesRequest{
+    DisputeID: "dispute_id",
+}
+
+response, err := client.Disputes.Get(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+if response.Dispute != nil {
+    fmt.Printf("Dispute State: %s\n", response.Dispute.State)
+    fmt.Printf("Reason: %s\n", *response.Dispute.Reason)
+    fmt.Printf("Due Date: %s\n", *response.Dispute.DueAt)
+}
+```
+</CodeGroup>
+
+---
+
+### Accept Dispute
+
+Accepts the loss on a dispute. Square returns the disputed amount to the cardholder and updates the dispute state to ACCEPTED.
+
+```go
+client.Disputes.Accept(ctx context.Context, request *square.AcceptDisputesRequest) (*square.AcceptDisputeResponse, error)
+```
+
+<ParamField path="DisputeID" type="string" required>
+  The ID of the dispute you want to accept.
+</ParamField>
+
+<ResponseField name="response" type="*square.AcceptDisputeResponse">
+  The updated dispute with ACCEPTED state
+</ResponseField>
+
+<Warning>
+Square debits the disputed amount from the seller's Square account. If the Square account does not have sufficient funds, Square debits the associated bank account.
+</Warning>
+
+<CodeGroup>
+```go Example
+request := &square.AcceptDisputesRequest{
+    DisputeID: "dispute_id",
+}
+
+response, err := client.Disputes.Accept(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Dispute accepted. New state: %s\n", response.Dispute.State)
+```
+</CodeGroup>
+
+---
+
+### Create Evidence Text
+
+Uploads text to use as evidence for a dispute challenge.
+
+```go
+client.Disputes.CreateEvidenceText(ctx context.Context, request *square.CreateDisputeEvidenceTextRequest) (*square.CreateDisputeEvidenceTextResponse, error)
+```
+
+<ParamField path="request" type="*square.CreateDisputeEvidenceTextRequest" required>
+  <Expandable title="properties">
+    <ParamField path="DisputeID" type="string" required>
+      The ID of the dispute for which you want to upload evidence.
+    </ParamField>
+    
+    <ParamField path="IdempotencyKey" type="string" required>
+      A unique key identifying the request. See [Idempotency](https://developer.squareup.com/docs/working-with-apis/idempotency) for more information.
+    </ParamField>
+    
+    <ParamField path="EvidenceType" type="*square.DisputeEvidenceType">
+      The type of evidence you are uploading (e.g., TRACKING_NUMBER, RECEIPT, etc.).
+    </ParamField>
+    
+    <ParamField path="EvidenceText" type="string" required>
+      The evidence string (e.g., tracking number, customer communication, etc.).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.CreateDisputeEvidenceTextResponse">
+  The created evidence details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.CreateDisputeEvidenceTextRequest{
+    DisputeID: "dispute_id",
+    IdempotencyKey: "ed3ee3933d946f1514d505d173c82648",
+    EvidenceType: square.DisputeEvidenceTypeTrackingNumber.Ptr(),
+    EvidenceText: "1Z8888888888888888",
+}
+
+response, err := client.Disputes.CreateEvidenceText(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Evidence uploaded successfully")
+```
+</CodeGroup>
+
+---
+
+### Create Evidence File
+
+Uploads a file to use as evidence in a dispute challenge. The endpoint accepts HTTP multipart/form-data file uploads in HEIC, HEIF, JPEG, PDF, PNG, and TIFF formats.
+
+```go
+client.Disputes.CreateEvidenceFile(ctx context.Context, request *square.CreateEvidenceFileDisputesRequest) (*square.CreateDisputeEvidenceFileResponse, error)
+```
+
+<ParamField path="request" type="*square.CreateEvidenceFileDisputesRequest" required>
+  <Expandable title="properties">
+    <ParamField path="DisputeID" type="string" required>
+      The ID of the dispute for which you want to upload evidence.
+    </ParamField>
+    
+    <ParamField path="ImageFile" type="io.Reader" required>
+      The file to upload as evidence.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.CreateDisputeEvidenceFileResponse">
+  The created evidence file details
+</ResponseField>
+
+<CodeGroup>
+```go Example
+import (
+    "os"
+    "github.com/square/square-go-sdk/square"
+)
+
+file, err := os.Open("receipt.pdf")
+if err != nil {
+    log.Fatal(err)
+}
+defer file.Close()
+
+request := &square.CreateEvidenceFileDisputesRequest{
+    DisputeID: "dispute_id",
+    ImageFile: file,
+}
+
+response, err := client.Disputes.CreateEvidenceFile(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("File evidence uploaded successfully")
+```
+</CodeGroup>
+
+---
+
+### Submit Evidence
+
+Submits evidence to the cardholder's bank. The evidence submitted includes evidence uploaded using CreateDisputeEvidenceFile and CreateDisputeEvidenceText endpoints, plus evidence automatically provided by Square when available.
+
+```go
+client.Disputes.SubmitEvidence(ctx context.Context, request *square.SubmitEvidenceDisputesRequest) (*square.SubmitEvidenceResponse, error)
+```
+
+<ParamField path="DisputeID" type="string" required>
+  The ID of the dispute for which you want to submit evidence.
+</ParamField>
+
+<ResponseField name="response" type="*square.SubmitEvidenceResponse">
+  The updated dispute with evidence submission status
+</ResponseField>
+
+<Warning>
+Evidence cannot be removed from a dispute after submission. Make sure all evidence is uploaded before calling this endpoint.
+</Warning>
+
+<CodeGroup>
+```go Example
+request := &square.SubmitEvidenceDisputesRequest{
+    DisputeID: "dispute_id",
+}
+
+response, err := client.Disputes.SubmitEvidence(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Evidence submitted. Dispute state: %s\n", response.Dispute.State)
+```
+</CodeGroup>
+
+## Dispute Workflow
+
+### Typical Dispute Process
+
+1. **Dispute Initiated**: A customer disputes a charge with their bank
+2. **Square Notifies Merchant**: Dispute appears in the API with state `INQUIRY_EVIDENCE_REQUIRED` or `EVIDENCE_REQUIRED`
+3. **Merchant Uploads Evidence**: Use CreateEvidenceText and CreateEvidenceFile to upload supporting documentation
+4. **Evidence Submitted**: Call SubmitEvidence to send all evidence to the bank
+5. **Bank Reviews**: The bank reviews the evidence and makes a decision
+6. **Resolution**: Dispute is either `WON` (merchant keeps funds) or `LOST` (funds returned to customer)
+
+### Dispute States
+
+- `INQUIRY_EVIDENCE_REQUIRED`: Initial inquiry, evidence can be submitted
+- `INQUIRY_PROCESSING`: Inquiry is being processed
+- `INQUIRY_CLOSED`: Inquiry closed without becoming a chargeback
+- `EVIDENCE_REQUIRED`: Chargeback filed, evidence needed
+- `PROCESSING`: Evidence is being reviewed
+- `WON`: Dispute won by merchant
+- `LOST`: Dispute lost, funds returned to customer
+- `ACCEPTED`: Merchant accepted the dispute
+
+## Evidence Types
+
+Common evidence types include:
+
+- `RECEIPT`: Proof of purchase receipt
+- `CUSTOMER_COMMUNICATION`: Emails or messages with customer
+- `TRACKING_NUMBER`: Shipping tracking number
+- `CUSTOMER_SIGNATURE`: Signature from customer
+- `SERVICE_DATE`: Date service was provided
+- `CANCELLATION_POLICY`: Terms and cancellation policy
+- `REFUND_POLICY`: Refund policy
+- `PROOF_OF_DELIVERY`: Delivery confirmation
+- `CUSTOMER_INFORMATION`: Customer account information
+
+## Best Practices
+
+### Respond Quickly
+
+Disputes have strict deadlines. Respond as soon as possible to maximize your chances of winning.
+
+### Provide Comprehensive Evidence
+
+Upload multiple pieces of evidence that support your case:
+- Receipts showing the transaction
+- Tracking information for shipped items
+- Communication with the customer
+- Proof of service delivery
+- Terms and conditions the customer agreed to
+
+### Automate Where Possible
+
+Consider automating evidence submission for common scenarios:
+
+```go Example: Auto-submit tracking for shipped orders
+if dispute.Reason == "PRODUCT_NOT_RECEIVED" {
+    // Retrieve order from your system
+    order := getOrder(dispute.PaymentID)
+    
+    if order.TrackingNumber != "" {
+        // Submit tracking number as evidence
+        evidenceRequest := &square.CreateDisputeEvidenceTextRequest{
+            DisputeID: dispute.ID,
+            IdempotencyKey: uuid.New().String(),
+            EvidenceType: square.DisputeEvidenceTypeTrackingNumber.Ptr(),
+            EvidenceText: order.TrackingNumber,
+        }
+        client.Disputes.CreateEvidenceText(context.TODO(), evidenceRequest)
+    }
+}
+```
+
+### Monitor Dispute Status
+
+Regularly check dispute status and act based on state changes:
+
+```go Example: Dispute monitoring
+disputes, _ := client.Disputes.List(context.TODO(), &square.ListDisputesRequest{
+    States: square.DisputeStateEvidenceRequired.Ptr(),
+})
+
+for _, dispute := range disputes.Disputes {
+    if isDeadlineApproaching(dispute.DueAt) {
+        notifyMerchant(dispute)
+    }
+}
+```
+
+## Learn More
+
+- [Square Disputes API Documentation](https://developer.squareup.com/docs/disputes-api/overview)
+- [Manage Disputes](https://developer.squareup.com/docs/disputes-api/manage-disputes)
+- [Best Practices for Winning Disputes](https://squareup.com/help/us/en/article/5394-chargeback-process-and-faqs)

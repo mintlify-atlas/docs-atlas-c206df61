@@ -1,0 +1,316 @@
+---
+title: "Payouts API"
+description: "Retrieve payout information and payout entries with the Square Go SDK"
+---
+
+The Payouts API provides access to payout records for a Square account. Use this API to retrieve payout details, track settlement history, and reconcile transactions.
+
+## Client Methods
+
+### List Payouts
+
+Retrieves a list of all payouts for the default location. You can filter payouts by location ID, status, time range, and order them in ascending or descending order.
+
+```go
+client.Payouts.List(ctx context.Context, request *square.ListPayoutsRequest) (*square.ListPayoutsResponse, error)
+```
+
+<ParamField path="request" type="*square.ListPayoutsRequest">
+  Request parameters for listing payouts
+  
+  <Expandable title="properties">
+    <ParamField path="LocationID" type="*string">
+      The ID of the location for which to list the payouts. By default, payouts are returned for the default (main) location associated with the seller.
+    </ParamField>
+    
+    <ParamField path="Status" type="*square.PayoutStatus">
+      If provided, only payouts with the given status are returned.
+    </ParamField>
+    
+    <ParamField path="BeginTime" type="*string">
+      The timestamp for the beginning of the payout creation time, in RFC 3339 format. Inclusive. Default: The current time minus one year.
+    </ParamField>
+    
+    <ParamField path="EndTime" type="*string">
+      The timestamp for the end of the payout creation time, in RFC 3339 format. Default: The current time.
+    </ParamField>
+    
+    <ParamField path="SortOrder" type="*square.SortOrder">
+      The order in which payouts are listed (ASC or DESC).
+    </ParamField>
+    
+    <ParamField path="Cursor" type="*string">
+      A pagination cursor returned by a previous call to this endpoint. Provide this cursor to retrieve the next set of results.
+    </ParamField>
+    
+    <ParamField path="Limit" type="*int">
+      The maximum number of results to be returned in a single page. Default: 100 (also the maximum allowed value).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.ListPayoutsResponse">
+  The list of payouts
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.ListPayoutsRequest{
+    LocationID: square.String("location_id"),
+    Status: square.PayoutStatusSent.Ptr(),
+    BeginTime: square.String("2024-01-01T00:00:00Z"),
+    EndTime: square.String("2024-12-31T23:59:59Z"),
+    SortOrder: square.SortOrderDesc.Ptr(),
+    Limit: square.Int(25),
+}
+
+response, err := client.Payouts.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Iterate through payouts
+for _, payout := range response.Payouts {
+    fmt.Printf("Payout ID: %s, Amount: %d %s, Status: %s\n",
+        payout.ID,
+        *payout.AmountMoney.Amount,
+        *payout.AmountMoney.Currency,
+        payout.Status,
+    )
+}
+```
+</CodeGroup>
+
+---
+
+### Get Payout
+
+Retrieves details of a specific payout identified by a payout ID.
+
+```go
+client.Payouts.Get(ctx context.Context, request *square.GetPayoutsRequest) (*square.GetPayoutResponse, error)
+```
+
+<ParamField path="PayoutID" type="string" required>
+  The ID of the payout to retrieve the information for.
+</ParamField>
+
+<ResponseField name="response" type="*square.GetPayoutResponse">
+  The payout details including amount, status, and destination information
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.GetPayoutsRequest{
+    PayoutID: "payout_id",
+}
+
+response, err := client.Payouts.Get(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+if response.Payout != nil {
+    fmt.Printf("Payout Amount: %d %s\n",
+        *response.Payout.AmountMoney.Amount,
+        *response.Payout.AmountMoney.Currency,
+    )
+    fmt.Printf("Status: %s\n", response.Payout.Status)
+    fmt.Printf("Arrival Date: %s\n", *response.Payout.ArrivalDate)
+}
+```
+</CodeGroup>
+
+---
+
+### List Payout Entries
+
+Retrieves a list of all payout entries for a specific payout. Payout entries represent individual transactions that contribute to the payout amount.
+
+```go
+client.Payouts.ListEntries(ctx context.Context, request *square.ListEntriesPayoutsRequest) (*square.ListPayoutEntriesResponse, error)
+```
+
+<ParamField path="request" type="*square.ListEntriesPayoutsRequest" required>
+  <Expandable title="properties">
+    <ParamField path="PayoutID" type="string" required>
+      The ID of the payout to retrieve the information for.
+    </ParamField>
+    
+    <ParamField path="SortOrder" type="*square.SortOrder">
+      The order in which payout entries are listed (ASC or DESC).
+    </ParamField>
+    
+    <ParamField path="Cursor" type="*string">
+      A pagination cursor returned by a previous call to this endpoint.
+    </ParamField>
+    
+    <ParamField path="Limit" type="*int">
+      The maximum number of results to be returned in a single page. Default: 100 (also the maximum allowed value).
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ResponseField name="response" type="*square.ListPayoutEntriesResponse">
+  The list of payout entries with details about each transaction
+</ResponseField>
+
+<CodeGroup>
+```go Example
+request := &square.ListEntriesPayoutsRequest{
+    PayoutID: "payout_id",
+    SortOrder: square.SortOrderDesc.Ptr(),
+    Limit: square.Int(100),
+}
+
+response, err := client.Payouts.ListEntries(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Iterate through payout entries
+for _, entry := range response.PayoutEntries {
+    fmt.Printf("Entry ID: %s, Type: %s, Amount: %d\n",
+        entry.ID,
+        entry.Type,
+        *entry.GrossAmountMoney.Amount,
+    )
+}
+```
+</CodeGroup>
+
+## Key Concepts
+
+### Payout Status
+
+Payouts can have the following statuses:
+- `SENT`: The payout has been sent to the bank
+- `PAID`: The payout has been received by the bank
+- `FAILED`: The payout failed
+
+### Payout Entries
+
+Payout entries represent individual transactions that contribute to a payout:
+- **Payments**: Customer payments received
+- **Refunds**: Refunds issued to customers
+- **Fees**: Square processing fees
+- **Adjustments**: Other adjustments (chargebacks, disputes, etc.)
+- **Transfers**: Transfers between locations
+
+### Settlement Timeline
+
+Payouts typically follow this timeline:
+1. Transactions are processed throughout the day
+2. Square calculates the payout amount (payments minus refunds and fees)
+3. Payout is initiated (status: SENT)
+4. Bank receives the payout (status: PAID)
+5. Funds are available in your account
+
+Settlement times vary by country and bank, typically 1-2 business days.
+
+## Payout Object Fields
+
+The Payout object includes:
+- `ID`: Unique identifier for the payout
+- `Status`: Current status of the payout
+- `LocationID`: The location associated with the payout
+- `CreatedAt`: When the payout was created
+- `UpdatedAt`: When the payout was last updated
+- `AmountMoney`: Total payout amount
+- `Destination`: Bank account receiving the payout
+- `ArrivalDate`: Expected date funds will arrive
+- `EndToEndID`: Bank transaction ID
+
+## Use Cases
+
+### Reconciliation
+
+Reconcile your accounting records with Square payouts:
+
+```go Example: Reconcile Monthly Payouts
+startOfMonth := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+endOfMonth := time.Date(2024, 1, 31, 23, 59, 59, 0, time.UTC)
+
+request := &square.ListPayoutsRequest{
+    BeginTime: square.String(startOfMonth.Format(time.RFC3339)),
+    EndTime: square.String(endOfMonth.Format(time.RFC3339)),
+    Status: square.PayoutStatusPaid.Ptr(),
+}
+
+response, err := client.Payouts.List(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+var totalPayouts int64
+for _, payout := range response.Payouts {
+    totalPayouts += *payout.AmountMoney.Amount
+}
+
+fmt.Printf("Total payouts for January: $%.2f\n", float64(totalPayouts)/100)
+```
+
+### Transaction Detail Analysis
+
+Analyze individual transactions within a payout:
+
+```go Example: Analyze Payout Composition
+entriesRequest := &square.ListEntriesPayoutsRequest{
+    PayoutID: payoutID,
+}
+
+entriesResponse, err := client.Payouts.ListEntries(context.TODO(), entriesRequest)
+if err != nil {
+    log.Fatal(err)
+}
+
+var payments, refunds, fees int64
+for _, entry := range entriesResponse.PayoutEntries {
+    switch entry.Type {
+    case "CHARGE":
+        payments += *entry.GrossAmountMoney.Amount
+    case "REFUND":
+        refunds += *entry.GrossAmountMoney.Amount
+    case "FEE":
+        fees += *entry.GrossAmountMoney.Amount
+    }
+}
+
+fmt.Printf("Payments: $%.2f\n", float64(payments)/100)
+fmt.Printf("Refunds: $%.2f\n", float64(refunds)/100)
+fmt.Printf("Fees: $%.2f\n", float64(fees)/100)
+```
+
+### Payout Notifications
+
+Monitor payouts and send notifications when they complete:
+
+```go Example: Monitor Payout Status
+request := &square.GetPayoutsRequest{
+    PayoutID: payoutID,
+}
+
+response, err := client.Payouts.Get(context.TODO(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+if response.Payout.Status == "PAID" {
+    // Send notification to merchant
+    sendNotification(
+        fmt.Sprintf("Payout of $%.2f has been deposited to your account",
+            float64(*response.Payout.AmountMoney.Amount)/100,
+        ),
+    )
+}
+```
+
+## OAuth Permissions
+
+To call Payouts API endpoints, set `PAYOUTS_READ` for the OAuth scope.
+
+## Learn More
+
+- [Square Payouts API Documentation](https://developer.squareup.com/docs/payouts-api)
+- [Settlement Reports](https://developer.squareup.com/docs/payments-api/reconciliation)
+- [Understanding Square Fees](https://squareup.com/us/en/pricing)

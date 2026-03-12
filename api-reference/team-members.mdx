@@ -1,0 +1,260 @@
+---
+title: "Team Members"
+description: "Manage team members in your Square account using the Team Members API"
+---
+
+The Team Members API provides methods to create, retrieve, update, and search for team members in your Square account.
+
+## Overview
+
+The `client.TeamMembers` client provides access to team member management operations:
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/v3"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+
+// Use the TeamMembers client
+response, err := client.TeamMembers.Search(context.Background(), &square.SearchTeamMembersRequest{})
+```
+
+## Methods
+
+### Create
+
+Creates a single `TeamMember` object. The created `TeamMember` object is returned on successful creates.
+
+```go
+request := &square.CreateTeamMemberRequest{
+    TeamMember: &square.TeamMember{
+        GivenName: square.String("Joe"),
+        FamilyName: square.String("Doe"),
+        EmailAddress: square.String("joe.doe@example.com"),
+        PhoneNumber: square.String("+14155552671"),
+        AssignedLocations: &square.TeamMemberAssignedLocations{
+            AssignmentType: square.TeamMemberAssignedLocationsAssignmentTypeExplicitLocations.Ptr(),
+            LocationIDs: []string{"LOCATION_ID_1", "LOCATION_ID_2"},
+        },
+    },
+}
+
+response, err := client.TeamMembers.Create(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created team member: %s\n", *response.TeamMember.ID)
+```
+
+<ParamField path="idempotencyKey" type="*string">
+  A unique string that identifies this `CreateTeamMember` request. Keys can be any valid string, but must be unique for every request. The minimum length is 1 and the maximum length is 45.
+</ParamField>
+
+<ParamField path="teamMember" type="*square.TeamMember" required>
+  The data used to create the `TeamMember` object. If you include `wage_setting`, you must provide `job_id` for each job assignment. To get job IDs, call [ListJobs](api-endpoint:Team-ListJobs).
+</ParamField>
+
+### BatchCreate
+
+Creates multiple `TeamMember` objects. The created `TeamMember` objects are returned on successful creates. This process is non-transactional and processes as much of the request as possible.
+
+```go
+request := &square.BatchCreateTeamMembersRequest{
+    TeamMembers: map[string]*square.CreateTeamMemberRequest{
+        "idempotency-key-1": &square.CreateTeamMemberRequest{
+            TeamMember: &square.TeamMember{
+                ReferenceID: square.String("reference_id_1"),
+                GivenName: square.String("Joe"),
+                FamilyName: square.String("Doe"),
+                EmailAddress: square.String("joe_doe@gmail.com"),
+                PhoneNumber: square.String("+14159283333"),
+                AssignedLocations: &square.TeamMemberAssignedLocations{
+                    AssignmentType: square.TeamMemberAssignedLocationsAssignmentTypeExplicitLocations.Ptr(),
+                    LocationIDs: []string{"YSGH2WBKG94QZ", "GA2Y9HSJ8KRYT"},
+                },
+            },
+        },
+    },
+}
+
+response, err := client.TeamMembers.BatchCreate(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="teamMembers" type="map[string]*square.CreateTeamMemberRequest" required>
+  The data used to create the `TeamMember` objects. Each key is the `idempotency_key` that maps to the `CreateTeamMemberRequest`. The maximum number of create objects is 25.
+</ParamField>
+
+### BatchUpdate
+
+Updates multiple `TeamMember` objects. The updated `TeamMember` objects are returned on successful updates.
+
+```go
+request := &square.BatchUpdateTeamMembersRequest{
+    TeamMembers: map[string]*square.UpdateTeamMemberRequest{
+        "team-member-id-1": &square.UpdateTeamMemberRequest{
+            TeamMember: &square.TeamMember{
+                GivenName: square.String("Jane"),
+                FamilyName: square.String("Smith"),
+                EmailAddress: square.String("jane_smith@gmail.com"),
+                PhoneNumber: square.String("+14159223334"),
+            },
+        },
+    },
+}
+
+response, err := client.TeamMembers.BatchUpdate(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="teamMembers" type="map[string]*square.UpdateTeamMemberRequest" required>
+  The data used to update the `TeamMember` objects. Each key is the `team_member_id` that maps to the `UpdateTeamMemberRequest`. The maximum number of update objects is 25.
+</ParamField>
+
+### Search
+
+Returns a paginated list of `TeamMember` objects for a business. The list can be filtered by location IDs, `ACTIVE` or `INACTIVE` status, or whether the team member is the Square account owner.
+
+```go
+request := &square.SearchTeamMembersRequest{
+    Query: &square.SearchTeamMembersQuery{
+        Filter: &square.SearchTeamMembersFilter{
+            LocationIDs: []string{"0G5P3VGACMMQZ"},
+            Status: square.TeamMemberStatusActive.Ptr(),
+        },
+    },
+    Limit: square.Int(10),
+}
+
+response, err := client.TeamMembers.Search(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, member := range response.TeamMembers {
+    fmt.Printf("%s %s\n", *member.GivenName, *member.FamilyName)
+}
+```
+
+<ParamField path="query" type="*square.SearchTeamMembersQuery">
+  The query parameters.
+</ParamField>
+
+<ParamField path="limit" type="*int">
+  The maximum number of `TeamMember` objects in a page (100 by default).
+</ParamField>
+
+<ParamField path="cursor" type="*string">
+  The opaque cursor for fetching the next page. For more information, see [pagination](https://developer.squareup.com/docs/working-with-apis/pagination).
+</ParamField>
+
+### Get
+
+Retrieves a `TeamMember` object for the given `TeamMember.id`.
+
+```go
+request := &square.GetTeamMembersRequest{
+    TeamMemberID: "team_member_id",
+}
+
+response, err := client.TeamMembers.Get(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Team member: %s %s\n", *response.TeamMember.GivenName, *response.TeamMember.FamilyName)
+```
+
+<ParamField path="teamMemberID" type="string" required>
+  The ID of the team member to retrieve.
+</ParamField>
+
+### Update
+
+Updates a single `TeamMember` object. The `TeamMember` object is returned on successful updates.
+
+```go
+request := &square.UpdateTeamMembersRequest{
+    TeamMemberID: "team_member_id",
+    Body: &square.UpdateTeamMemberRequest{
+        TeamMember: &square.TeamMember{
+            GivenName: square.String("Joe"),
+            FamilyName: square.String("Doe"),
+            EmailAddress: square.String("joe_doe@gmail.com"),
+            PhoneNumber: square.String("+14159283333"),
+        },
+    },
+}
+
+response, err := client.TeamMembers.Update(context.Background(), request)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="teamMemberID" type="string" required>
+  The ID of the team member to update.
+</ParamField>
+
+<ParamField path="teamMember" type="*square.TeamMember" required>
+  The team member fields to add, change, or clear. Fields can be cleared using a null value. To update `wage_setting.job_assignments`, you must provide the complete list of job assignments.
+</ParamField>
+
+## TeamMember Object
+
+<ResponseField name="id" type="*string">
+  The unique ID for the team member.
+</ResponseField>
+
+<ResponseField name="referenceID" type="*string">
+  A second ID used to associate the team member with an entity in another system.
+</ResponseField>
+
+<ResponseField name="isOwner" type="*bool">
+  Whether the team member is the owner of the Square account.
+</ResponseField>
+
+<ResponseField name="status" type="*square.TeamMemberStatus">
+  Describes the status of the team member. Possible values: `ACTIVE`, `INACTIVE`.
+</ResponseField>
+
+<ResponseField name="givenName" type="*string">
+  The given name (first name) associated with the team member.
+</ResponseField>
+
+<ResponseField name="familyName" type="*string">
+  The family name (last name) associated with the team member.
+</ResponseField>
+
+<ResponseField name="emailAddress" type="*string">
+  The email address associated with the team member.
+</ResponseField>
+
+<ResponseField name="phoneNumber" type="*string">
+  The team member's phone number, in E.164 format (e.g., +14155552671).
+</ResponseField>
+
+<ResponseField name="createdAt" type="*string">
+  The timestamp when the team member was created, in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="updatedAt" type="*string">
+  The timestamp when the team member was last updated, in RFC 3339 format.
+</ResponseField>
+
+<ResponseField name="assignedLocations" type="*square.TeamMemberAssignedLocations">
+  Describes the team member's assigned locations.
+</ResponseField>
+
+<ResponseField name="wageSetting" type="*square.WageSetting">
+  Information about the team member's overtime exemption status, job assignments, and compensation.
+</ResponseField>

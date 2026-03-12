@@ -1,0 +1,472 @@
+---
+title: Request Options
+description: Learn how to customize API requests using the option package
+---
+
+The Square Go SDK provides a flexible `option` package that allows you to customize both client-wide and per-request behavior, including authentication, HTTP headers, custom HTTP clients, and more.
+
+## Available Request Options
+
+The SDK provides the following request options:
+
+<CardGroup cols={2}>
+  <Card title="WithToken" icon="key">
+    Set the Bearer token for authentication
+  </Card>
+  
+  <Card title="WithHTTPClient" icon="globe">
+    Use a custom HTTP client
+  </Card>
+  
+  <Card title="WithBaseURL" icon="server">
+    Override the base URL
+  </Card>
+  
+  <Card title="WithHTTPHeader" icon="file-lines">
+    Add custom HTTP headers
+  </Card>
+  
+  <Card title="WithMaxAttempts" icon="rotate">
+    Configure retry attempts
+  </Card>
+  
+  <Card title="WithQueryParameters" icon="circle-question">
+    Add extra query parameters
+  </Card>
+  
+  <Card title="WithBodyProperties" icon="code">
+    Add extra body properties
+  </Card>
+</CardGroup>
+
+## Client-Wide Options
+
+Options can be specified when creating the client to apply to all requests:
+
+```go
+import (
+    "net/http"
+    "time"
+    
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+client := squareclient.NewClient(
+    option.WithToken("YOUR_API_KEY"),
+    option.WithHTTPClient(
+        &http.Client{
+            Timeout: 5 * time.Second,
+        },
+    ),
+)
+```
+
+These options apply to every API call made with this client.
+
+## Per-Request Options
+
+Options can also be specified for individual requests, overriding client-wide settings:
+
+```go
+import "context"
+
+response, err := client.Payments.List(
+    context.TODO(),
+    &square.ListPaymentsRequest{
+        Total: square.Int64(100),
+    },
+    option.WithToken("DIFFERENT_API_KEY"),
+    option.WithMaxAttempts(1),
+)
+```
+
+<Note>
+Per-request options take precedence over client-wide options.
+</Note>
+
+## Authentication with WithToken
+
+Set the access token for API authentication:
+
+```go
+// Client-wide token
+client := squareclient.NewClient(
+    option.WithToken("sq0atp-xxxxx"),
+)
+
+// Per-request token (useful for multi-tenant applications)
+response, err := client.Payments.Create(
+    ctx,
+    request,
+    option.WithToken(userToken),
+)
+```
+
+The SDK automatically sets the `Authorization: Bearer <token>` header.
+
+### Token from Environment Variable
+
+If no token is specified, the SDK reads from the `SQUARE_TOKEN` environment variable:
+
+```go
+// Reads from SQUARE_TOKEN env var
+client := squareclient.NewClient()
+```
+
+## Custom HTTP Client
+
+Provide your own instrumented HTTP client:
+
+```go
+import (
+    "net/http"
+    "time"
+)
+
+customClient := &http.Client{
+    Timeout: 10 * time.Second,
+    Transport: &http.Transport{
+        MaxIdleConns:        100,
+        MaxIdleConnsPerHost: 100,
+        IdleConnTimeout:     90 * time.Second,
+    },
+}
+
+client := squareclient.NewClient(
+    option.WithHTTPClient(customClient),
+)
+```
+
+<Warning>
+Providing your own `*http.Client` is recommended. Otherwise, `http.DefaultClient` will be used, which waits indefinitely for responses unless per-request context timeouts are used.
+</Warning>
+
+### HTTP Client with Custom Transport
+
+```go
+import (
+    "net/http"
+    "crypto/tls"
+)
+
+transport := &http.Transport{
+    TLSClientConfig: &tls.Config{
+        MinVersion: tls.VersionTLS12,
+    },
+    Proxy: http.ProxyFromEnvironment,
+}
+
+client := squareclient.NewClient(
+    option.WithHTTPClient(&http.Client{
+        Transport: transport,
+        Timeout:   30 * time.Second,
+    }),
+)
+```
+
+## Custom HTTP Headers
+
+Add custom headers to requests:
+
+```go
+import "net/http"
+
+headers := http.Header{}
+headers.Set("X-Custom-Header", "value")
+headers.Set("X-Request-ID", "123456")
+
+response, err := client.Payments.Create(
+    ctx,
+    request,
+    option.WithHTTPHeader(headers),
+)
+```
+
+### Headers for All Requests
+
+```go
+headers := http.Header{}
+headers.Set("X-App-Version", "1.0.0")
+headers.Set("X-Client-ID", "my-app")
+
+client := squareclient.NewClient(
+    option.WithToken(token),
+    option.WithHTTPHeader(headers),
+)
+```
+
+<Note>
+The SDK automatically clones headers to prevent modification after the option is created.
+</Note>
+
+## Extra Query Parameters
+
+Add query parameters not directly supported by the SDK:
+
+```go
+import "net/url"
+
+response, err := client.TeamMembers.Search(
+    context.TODO(),
+    &square.SearchTeamMembersRequest{
+        Limit: square.Int(100),
+    },
+    option.WithQueryParameters(
+        url.Values{
+            "status": []string{"DEACTIVATED"},
+        },
+    ),
+)
+```
+
+This is useful for:
+- Testing unreleased API features
+- Using hidden parameters
+- Backward compatibility with old API versions
+
+## Extra Body Properties
+
+Add body properties not directly supported by the SDK:
+
+```go
+response, err := client.Customers.Create(
+    ctx,
+    request,
+    option.WithBodyProperties(
+        map[string]interface{}{
+            "custom_field": "value",
+            "beta_feature": true,
+        },
+    ),
+)
+```
+
+<Warning>
+Extra properties are merged with the request body. If a property exists in both, the extra property takes precedence.
+</Warning>
+
+## Configuring Retry Behavior
+
+Control the number of retry attempts:
+
+```go
+// Disable retries for this request
+response, err := client.Payments.Create(
+    ctx,
+    request,
+    option.WithMaxAttempts(1),
+)
+
+// Increase retries for important operations
+response, err := client.Orders.Create(
+    ctx,
+    request,
+    option.WithMaxAttempts(5),
+)
+```
+
+See the [Retries documentation](/core-concepts/retries) for more details.
+
+## Combining Multiple Options
+
+You can combine multiple options in a single request:
+
+```go
+import (
+    "net/http"
+    "net/url"
+)
+
+headers := http.Header{}
+headers.Set("X-Request-ID", requestID)
+
+response, err := client.Payments.List(
+    ctx,
+    request,
+    option.WithToken(userToken),
+    option.WithHTTPHeader(headers),
+    option.WithMaxAttempts(3),
+    option.WithQueryParameters(url.Values{
+        "include_deleted": []string{"true"},
+    }),
+)
+```
+
+## Option Implementation
+
+The `option` package is a thin wrapper around the `core` package:
+
+```go
+// From option/request_option.go
+package option
+
+import (
+    core "github.com/square/square-go-sdk/v3/core"
+    http "net/http"
+    url "net/url"
+)
+
+type RequestOption = core.RequestOption
+
+func WithToken(token string) *core.TokenOption {
+    return &core.TokenOption{
+        Token: token,
+    }
+}
+
+func WithMaxAttempts(attempts uint) *core.MaxAttemptsOption {
+    return &core.MaxAttemptsOption{
+        MaxAttempts: attempts,
+    }
+}
+```
+
+## Common Use Cases
+
+<Tabs>
+  <Tab title="Multi-Tenant Application">
+    Use different tokens per request:
+    
+    ```go
+    func HandleRequest(tenantID string) error {
+        token := getTokenForTenant(tenantID)
+        
+        response, err := client.Customers.List(
+            ctx,
+            request,
+            option.WithToken(token),
+        )
+        return err
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Request Tracing">
+    Add tracing headers:
+    
+    ```go
+    func TraceableRequest(ctx context.Context, traceID string) error {
+        headers := http.Header{}
+        headers.Set("X-Trace-ID", traceID)
+        headers.Set("X-Parent-Span-ID", getSpanID(ctx))
+        
+        response, err := client.Payments.Create(
+            ctx,
+            request,
+            option.WithHTTPHeader(headers),
+        )
+        return err
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Testing">
+    Use custom base URL and client:
+    
+    ```go
+    func TestClient() *squareclient.Client {
+        return squareclient.NewClient(
+            option.WithBaseURL("http://localhost:8080"),
+            option.WithHTTPClient(mockHTTPClient),
+            option.WithToken("test-token"),
+        )
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Production Client">
+    Configure for production:
+    
+    ```go
+    func NewProductionClient(token string) *squareclient.Client {
+        return squareclient.NewClient(
+            option.WithToken(token),
+            option.WithHTTPClient(&http.Client{
+                Timeout: 30 * time.Second,
+                Transport: &http.Transport{
+                    MaxIdleConns:    100,
+                    IdleConnTimeout: 90 * time.Second,
+                },
+            }),
+            option.WithMaxAttempts(3),
+        )
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<Steps>
+  <Step title="Set client-wide defaults">
+    Configure common options (token, HTTP client) when creating the client.
+  </Step>
+  
+  <Step title="Override per-request when needed">
+    Use per-request options for request-specific configuration.
+  </Step>
+  
+  <Step title="Provide custom HTTP client">
+    Always provide a configured `*http.Client` with appropriate timeouts.
+  </Step>
+  
+  <Step title="Use environment variables for tokens">
+    Store access tokens in environment variables, not in code.
+  </Step>
+  
+  <Step title="Add headers for observability">
+    Include request IDs and trace IDs in headers for better debugging.
+  </Step>
+</Steps>
+
+## Advanced Example
+
+Complete example with multiple options:
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "net/http"
+    "time"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+    "github.com/square/square-go-sdk/option"
+)
+
+func main() {
+    // Create client with default options
+    client := squareclient.NewClient(
+        option.WithToken("YOUR_ACCESS_TOKEN"),
+        option.WithHTTPClient(&http.Client{
+            Timeout: 30 * time.Second,
+        }),
+        option.WithMaxAttempts(3),
+    )
+    
+    // Make request with additional options
+    headers := http.Header{}
+    headers.Set("X-Request-ID", "req-123")
+    
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+    defer cancel()
+    
+    response, err := client.Payments.List(
+        ctx,
+        &square.ListPaymentsRequest{
+            Total: square.Int64(100),
+        },
+        option.WithHTTPHeader(headers),
+    )
+    
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    log.Printf("Found %d payments", len(response.Payments))
+}
+```

@@ -1,0 +1,260 @@
+---
+title: Pagination
+description: Learn how to paginate through large result sets using the Square Go SDK's iterator pattern
+---
+
+The Square Go SDK provides automatic pagination support for list endpoints, allowing you to efficiently iterate through large result sets using either an iterator pattern or manual page-by-page navigation.
+
+## Using the Iterator Pattern
+
+The recommended approach is to use the built-in iterator, which automatically fetches new pages as needed:
+
+```go
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/square/square-go-sdk"
+    squareclient "github.com/square/square-go-sdk/client"
+)
+
+client := squareclient.NewClient(
+    option.WithToken("YOUR_ACCESS_TOKEN"),
+)
+
+ctx := context.TODO()
+page, err := client.Payments.List(
+    ctx,
+    &square.ListPaymentsRequest{
+        Total: square.Int64(100),
+    },
+)
+if err != nil {
+    return nil, err
+}
+
+iter := page.Iterator()
+for iter.Next(ctx) {
+    payment := iter.Current()
+    fmt.Printf("Got payment: %v\n", *payment.ID)
+}
+
+if err := iter.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+<Note>
+The iterator automatically handles pagination behind the scenes, fetching new pages as you iterate through results.
+</Note>
+
+## Iterator Methods
+
+The `PageIterator` provides three key methods:
+
+### Next(ctx context.Context) bool
+
+Advances the iterator to the next item, automatically fetching new pages when needed:
+
+```go
+iter := page.Iterator()
+for iter.Next(ctx) {
+    // Process each item
+    item := iter.Current()
+}
+```
+
+### Current() T
+
+Returns the current item in the iteration:
+
+```go
+for iter.Next(ctx) {
+    payment := iter.Current()
+    fmt.Printf("Payment ID: %s, Amount: %d\n", *payment.ID, *payment.AmountMoney.Amount)
+}
+```
+
+### Err() error
+
+Returns any error encountered during iteration (excluding `core.ErrNoPages`):
+
+```go
+for iter.Next(ctx) {
+    // Process items...
+}
+
+if err := iter.Err(); err != nil {
+    log.Printf("Error during iteration: %v", err)
+}
+```
+
+## Manual Page-by-Page Iteration
+
+For more control over pagination, you can manually fetch pages:
+
+```go
+import (
+    "errors"
+    
+    "github.com/square/square-go-sdk/core"
+)
+
+page, err := client.Payments.List(
+    ctx,
+    &square.ListPaymentsRequest{
+        Total: square.Int64(100),
+    },
+)
+if err != nil {
+    return err
+}
+
+for page != nil {
+    for _, payment := range page.Results {
+        fmt.Printf("Got payment: %v\n", *payment.ID)
+    }
+    
+    page, err = page.GetNextPage(ctx)
+    if errors.Is(err, core.ErrNoPages) {
+        break
+    }
+    if err != nil {
+        return err
+    }
+}
+```
+
+<Warning>
+Always check for `core.ErrNoPages` when manually iterating pages. This error indicates there are no more pages to fetch.
+</Warning>
+
+## Page Structure
+
+Each page contains:
+
+- **Results**: The items in the current page
+- **Response**: The full API response object
+- **StatusCode**: The HTTP status code
+- **Header**: The HTTP response headers
+- **RawResponse**: The raw page response data
+
+```go
+page, err := client.Payments.List(ctx, request)
+if err != nil {
+    return err
+}
+
+fmt.Printf("Page has %d results\n", len(page.Results))
+fmt.Printf("Status code: %d\n", page.StatusCode)
+
+// Access the full response
+response := page.Response
+```
+
+## Pagination Modes
+
+The SDK supports two pagination modes:
+
+<Tabs>
+  <Tab title="Cursor-Based">
+    Uses a cursor token to fetch the next page. Most Square API endpoints use cursor-based pagination.
+    
+    ```go
+    // The SDK handles cursor tokens automatically
+    page, err := client.Customers.List(ctx, &square.ListCustomersRequest{
+        Limit: square.Int64(50),
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Offset-Based">
+    Uses numeric offsets to navigate pages. Some endpoints use offset-based pagination.
+    
+    ```go
+    // The SDK handles offsets automatically
+    page, err := client.TeamMembers.Search(ctx, &square.SearchTeamMembersRequest{
+        Limit: square.Int(100),
+    })
+    ```
+  </Tab>
+</Tabs>
+
+## Context and Timeouts
+
+Pagination respects context cancellation and timeouts:
+
+```go
+import "time"
+
+// Set a timeout for the entire pagination operation
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+page, err := client.Payments.List(ctx, request)
+if err != nil {
+    return err
+}
+
+iter := page.Iterator()
+for iter.Next(ctx) {
+    payment := iter.Current()
+    // Process payment...
+}
+
+if err := iter.Err(); err != nil {
+    if err == context.DeadlineExceeded {
+        log.Println("Pagination timed out")
+    }
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use the iterator for simple cases">
+    The iterator pattern is cleaner and handles edge cases automatically.
+  </Step>
+  
+  <Step title="Check for errors after iteration">
+    Always call `iter.Err()` after the loop completes to catch any errors.
+  </Step>
+  
+  <Step title="Handle context cancellation">
+    Pass a context with timeout to prevent infinite loops if the API is slow.
+  </Step>
+  
+  <Step title="Process pages in batches">
+    For better performance, process items in batches rather than one at a time.
+  </Step>
+  
+  <Step title="Use manual pagination for complex logic">
+    If you need to implement custom pagination logic (e.g., saving progress), use manual page-by-page iteration.
+  </Step>
+</Steps>
+
+## Error Handling
+
+The `core.ErrNoPages` sentinel error indicates no more pages are available:
+
+```go
+import (
+    "errors"
+    "github.com/square/square-go-sdk/core"
+)
+
+page, err := page.GetNextPage(ctx)
+if errors.Is(err, core.ErrNoPages) {
+    // This is expected - no more pages
+    return nil
+}
+if err != nil {
+    // This is an actual error
+    return err
+}
+```
+
+<Note>
+`core.ErrNoPages` is similar to `io.EOF` - it's a signal that you've reached the end, not an error condition that needs handling.
+</Note>

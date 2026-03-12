@@ -1,0 +1,227 @@
+---
+title: "Cash Drawers"
+description: "Manage cash drawer shifts and track cash flow"
+---
+
+The Cash Drawers API helps you manage cash drawer shifts at your business locations. Track when drawers are opened and closed, monitor cash flow, and maintain accurate records of cash transactions.
+
+## Overview
+
+The Cash Drawers client provides methods for:
+- Listing cash drawer shifts within a date range
+- Retrieving detailed information about specific shifts
+- Viewing cash drawer shift events
+
+## Client Initialization
+
+```go
+import (
+    "context"
+    "github.com/square/square-go-sdk/square"
+    "github.com/square/square-go-sdk/square/cashdrawers"
+)
+
+client := square.NewClient(
+    square.WithAccessToken("YOUR_ACCESS_TOKEN"),
+)
+```
+
+## Methods
+
+### List Shifts
+
+Provides the details for all of the cash drawer shifts for a location in a date range.
+
+```go cash_drawers.go:18686
+request := &cashdrawers.ListShiftsRequest{
+    LocationID: "location_id",
+    SortOrder: square.SortOrderDesc.Ptr(),
+    BeginTime: square.String("2024-01-01T00:00:00Z"),
+    EndTime: square.String("2024-01-31T23:59:59Z"),
+    Limit: square.Int(100),
+    Cursor: square.String("cursor"),
+}
+response, err := client.CashDrawers.Shifts.List(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="locationID" type="string" required>
+  The ID of the location to query for a list of cash drawer shifts.
+</ParamField>
+
+<ParamField path="sortOrder" type="SortOrder">
+  The order in which cash drawer shifts are listed in the response, based on their opened_at field. Default value: ASC
+</ParamField>
+
+<ParamField path="beginTime" type="string">
+  The inclusive start time of the query on opened_at, in ISO 8601 format.
+</ParamField>
+
+<ParamField path="endTime" type="string">
+  The exclusive end date of the query on opened_at, in ISO 8601 format.
+</ParamField>
+
+<ParamField path="limit" type="int">
+  Number of cash drawer shift events in a page of results (200 by default, 1000 max).
+</ParamField>
+
+<ParamField path="cursor" type="string">
+  Opaque cursor for fetching the next page of results.
+</ParamField>
+
+<ResponseField name="shifts" type="[]CashDrawerShift">
+  A list of cash drawer shifts.
+</ResponseField>
+
+<ResponseField name="cursor" type="string">
+  Opaque cursor for fetching the next page of results.
+</ResponseField>
+
+### Get Shift
+
+Provides the summary details for a single cash drawer shift.
+
+```go cash_drawers.go:18807
+request := &cashdrawers.GetShiftsRequest{
+    ShiftID: "shift_id",
+    LocationID: "location_id",
+}
+response, err := client.CashDrawers.Shifts.Get(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="shiftID" type="string" required>
+  The shift ID.
+</ParamField>
+
+<ParamField path="locationID" type="string" required>
+  The ID of the location to retrieve cash drawer shifts from.
+</ParamField>
+
+<ResponseField name="shift" type="CashDrawerShift">
+  The requested cash drawer shift.
+</ResponseField>
+
+### List Shift Events
+
+Provides a paginated list of events for a single cash drawer shift.
+
+```go
+request := &cashdrawers.ListShiftEventsRequest{
+    ShiftID: "shift_id",
+    LocationID: "location_id",
+    Limit: square.Int(100),
+    Cursor: square.String("cursor"),
+}
+response, err := client.CashDrawers.Shifts.ListEvents(
+    context.TODO(),
+    request,
+)
+```
+
+<ParamField path="shiftID" type="string" required>
+  The shift ID.
+</ParamField>
+
+<ParamField path="locationID" type="string" required>
+  The ID of the location to list cash drawer shifts for.
+</ParamField>
+
+<ParamField path="limit" type="int">
+  Number of resources to return in a page of results (200 by default, 1000 max).
+</ParamField>
+
+<ParamField path="cursor" type="string">
+  Opaque cursor for fetching the next page of results.
+</ParamField>
+
+<ResponseField name="events" type="[]CashDrawerShiftEvent">
+  All of the events for the cash drawer shift.
+</ResponseField>
+
+## Use Cases
+
+### Track Daily Cash Flow
+
+Retrieve all cash drawer shifts for a specific day:
+
+```go
+request := &cashdrawers.ListShiftsRequest{
+    LocationID: "L1234567890",
+    BeginTime: square.String("2024-03-12T00:00:00Z"),
+    EndTime: square.String("2024-03-12T23:59:59Z"),
+    SortOrder: square.SortOrderAsc.Ptr(),
+}
+
+response, err := client.CashDrawers.Shifts.List(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, shift := range response.Shifts {
+    fmt.Printf("Shift ID: %s, Started: %s\n", 
+        shift.ID, shift.OpenedAt)
+}
+```
+
+### Reconcile Cash Drawer
+
+Get detailed information about a specific shift for reconciliation:
+
+```go
+request := &cashdrawers.GetShiftsRequest{
+    ShiftID: "shift_abc123",
+    LocationID: "L1234567890",
+}
+
+response, err := client.CashDrawers.Shifts.Get(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+shift := response.Shift
+fmt.Printf("Expected Cash: %d %s\n", 
+    shift.ExpectedCashMoney.Amount,
+    shift.ExpectedCashMoney.Currency)
+fmt.Printf("Actual Cash: %d %s\n", 
+    shift.CashPaymentMoney.Amount,
+    shift.CashPaymentMoney.Currency)
+```
+
+### Audit Shift Events
+
+Review all events that occurred during a cash drawer shift:
+
+```go
+request := &cashdrawers.ListShiftEventsRequest{
+    ShiftID: "shift_abc123",
+    LocationID: "L1234567890",
+}
+
+response, err := client.CashDrawers.Shifts.ListEvents(context.TODO(), request)
+if err != nil {
+    // Handle error
+}
+
+for _, event := range response.Events {
+    fmt.Printf("Event: %s at %s\n", 
+        event.EventType, event.CreatedAt)
+}
+```
+
+## Best Practices
+
+- Use date ranges to limit result sets and improve performance
+- Implement pagination when retrieving large numbers of shifts
+- Store shift IDs for later reconciliation and auditing
+- Compare expected vs actual cash amounts to identify discrepancies
+- Review shift events to understand cash flow throughout the day
+
+## Related Resources
+
+- [Locations API](/api-reference/locations)
+- [Payments API](/api-reference/payments)
