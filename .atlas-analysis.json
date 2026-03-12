@@ -1,0 +1,167 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Square Go SDK",
+  "projectDescription": "Go client library for the Square API",
+  "theme": "sequoia",
+  "primaryColor": "#040404",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart",
+              "authentication"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/error-handling",
+              "core-concepts/pagination",
+              "core-concepts/retries",
+              "core-concepts/environments",
+              "core-concepts/timeouts",
+              "core-concepts/request-options",
+              "core-concepts/webhooks"
+            ]
+          },
+          {
+            "group": "Advanced",
+            "pages": [
+              "advanced/extra-properties",
+              "advanced/custom-http-client"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/overview",
+              "api-reference/client"
+            ]
+          },
+          {
+            "group": "Payments",
+            "pages": [
+              "api-reference/payments",
+              "api-reference/refunds",
+              "api-reference/checkout",
+              "api-reference/cards",
+              "api-reference/apple-pay",
+              "api-reference/bank-accounts",
+              "api-reference/payouts",
+              "api-reference/disputes"
+            ]
+          },
+          {
+            "group": "Commerce",
+            "pages": [
+              "api-reference/orders",
+              "api-reference/catalog",
+              "api-reference/inventory",
+              "api-reference/subscriptions",
+              "api-reference/invoices"
+            ]
+          },
+          {
+            "group": "Customers",
+            "pages": [
+              "api-reference/customers",
+              "api-reference/loyalty",
+              "api-reference/gift-cards"
+            ]
+          },
+          {
+            "group": "Business",
+            "pages": [
+              "api-reference/locations",
+              "api-reference/merchants",
+              "api-reference/devices",
+              "api-reference/sites",
+              "api-reference/snippets",
+              "api-reference/channels"
+            ]
+          },
+          {
+            "group": "Team",
+            "pages": [
+              "api-reference/team",
+              "api-reference/team-members",
+              "api-reference/labor",
+              "api-reference/employees"
+            ]
+          },
+          {
+            "group": "Point of Sale",
+            "pages": [
+              "api-reference/terminal",
+              "api-reference/cash-drawers"
+            ]
+          },
+          {
+            "group": "Integration",
+            "pages": [
+              "api-reference/oauth",
+              "api-reference/webhooks-api",
+              "api-reference/events",
+              "api-reference/vendors",
+              "api-reference/transfer-orders"
+            ]
+          },
+          {
+            "group": "Legacy",
+            "pages": [
+              "api-reference/v1-transactions"
+            ]
+          },
+          {
+            "group": "Bookings",
+            "pages": [
+              "api-reference/bookings"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Complete Square API coverage with 30+ resource clients",
+    "Automatic pagination with iterator support",
+    "Built-in retry logic with exponential backoff",
+    "Webhook signature verification",
+    "Support for sandbox and production environments",
+    "Type-safe request and response models",
+    "Context-based timeout configuration",
+    "Flexible request options and custom HTTP clients"
+  ],
+  "publicApiSurface": [
+    "client.NewClient() - Initialize Square API client",
+    "client.Payments - Payment processing operations",
+    "client.Orders - Order management",
+    "client.Customers - Customer management",
+    "client.Catalog - Product catalog operations",
+    "client.Inventory - Inventory tracking",
+    "client.Invoices - Invoice management",
+    "client.Subscriptions - Subscription billing",
+    "client.Locations - Location management",
+    "client.OAuth - OAuth authentication",
+    "client.Webhooks.VerifySignature() - Webhook verification",
+    "option.WithToken() - Configure API token",
+    "option.WithBaseURL() - Configure environment",
+    "option.WithMaxAttempts() - Configure retry behavior",
+    "option.WithHTTPClient() - Custom HTTP client",
+    "square.Environments.Sandbox - Sandbox environment",
+    "square.Environments.Production - Production environment"
+  ]
+}
